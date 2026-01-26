@@ -7,7 +7,12 @@ from data_store import get_master_df, upsert_overlay_from_upload
 from tree_utils import build_nodes_and_lookup
 
 
-st.set_page_config(page_title="KIM VarMap – Export", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(
+    page_title="KIM VarMap – Export",
+    page_icon="🧠",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
 render_stepper(current_step=3)
 
@@ -30,6 +35,34 @@ def refresh_master_lookup():
     return leaf_lookup_master
 
 
+def build_export_view(df_selected: pd.DataFrame) -> pd.DataFrame:
+    df_out = df_selected.copy()
+
+    # Hide internal columns
+    df_out = df_out.drop(columns=[c for c in df_out.columns if str(c).startswith("__")], errors="ignore")
+
+    # Ensure provenance columns exist
+    if "user_created" not in df_out.columns:
+        df_out["user_created"] = False
+    if "user_uploaded_at" not in df_out.columns:
+        df_out["user_uploaded_at"] = pd.NA
+
+    # Friendly origin column
+    df_out["Origin"] = "Base"
+    df_out.loc[df_out["user_uploaded_at"].notna(), "Origin"] = "User upload"
+    df_out.loc[df_out["user_created"] == True, "Origin"] = "User created"
+
+    # Visible columns
+    preferred = ["Variable", "Organ System", "Group", "Source", "EPIC ID", "PDMS ID", "Unit", "Origin"]
+    cols = [c for c in preferred if c in df_out.columns]
+
+    # Append other non-provenance columns (optional)
+    hide_these = {"user_created", "user_uploaded_at"}
+    extras = [c for c in df_out.columns if c not in cols and c not in hide_these]
+
+    return df_out[cols + extras]
+
+
 # Ensure lookup exists even if user jumps directly to Export
 leaf_lookup_master = st.session_state.get("leaf_lookup_master")
 if not leaf_lookup_master:
@@ -43,20 +76,16 @@ st.subheader("Selected variables")
 if not selected_rows:
     st.info("No variables selected yet. Go to **Choose variables** and select some items.")
 else:
-    selected_df = pd.DataFrame(selected_rows)
+    selected_df_raw = pd.DataFrame(selected_rows)
+    export_view = build_export_view(selected_df_raw)
 
-    preferred_order = ["Variable", "Organ System", "Group", "Source", "EPIC ID", "PDMS ID", "Unit"]
-    ordered_cols = [c for c in preferred_order if c in selected_df.columns] + \
-                   [c for c in selected_df.columns if c not in preferred_order]
-    selected_df = selected_df[ordered_cols]
-
-    st.dataframe(selected_df, use_container_width=True, hide_index=True)
+    st.dataframe(export_view, use_container_width=True, hide_index=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     safe_project = (project_name or "kim_varmap").replace(" ", "_").replace("/", "_").lower()
     file_name = f"variablemapping_{safe_project}_{timestamp}.csv"
 
-    csv_bytes = selected_df.to_csv(index=False).encode("utf-8")
+    csv_bytes = export_view.to_csv(index=False).encode("utf-8")
 
     st.download_button(
         label="Download CSV",
@@ -109,23 +138,39 @@ if submitted:
         upload_df = pd.DataFrame([new_row])
         upsert_overlay_from_upload(upload_df)
 
-        # IMPORTANT: refresh lookup so export can immediately display the new row
+        # Refresh lookup so export can immediately display the new row
         leaf_lookup_master = refresh_master_lookup()
 
-        # Select it globally
-        leaf_value = f"{organ_system_clean}/{group_clean}/{variable_clean}"
-
+        # Select it globally (NEW leaf IDs include |row_key)
         checked_set = set(st.session_state.get("checked", []))
         checked_all_set = set(st.session_state.get("checked_all_list", []))
 
-        checked_set.add(leaf_value)
-        checked_all_set.add(leaf_value)
+        # Find the leaf value that matches the new row in the refreshed lookup
+        leaf_value_to_select = None
+        for leaf_value, row_dict in leaf_lookup_master.items():
+            if (
+                str(row_dict.get("Variable", "")).strip() == variable_clean
+                and str(row_dict.get("Organ System", "")).strip() == organ_system_clean
+                and str(row_dict.get("Group", "")).strip() == group_clean
+                and str(row_dict.get("Source", "")).strip() == str(source).strip()
+                and str(row_dict.get("EPIC ID", "")).strip() == epic_id.strip()
+                and str(row_dict.get("PDMS ID", "")).strip() == pdms_id.strip()
+                and str(row_dict.get("Unit", "")).strip() == unit_clean
+            ):
+                leaf_value_to_select = leaf_value
+                break
 
-        st.session_state["checked"] = sorted(list(checked_set))
-        st.session_state["checked_all_list"] = sorted(list(checked_all_set))
+        if leaf_value_to_select is None:
+            st.warning("Variable added, but could not auto-select it in the tree. Please select it manually.")
+        else:
+            checked_set.add(leaf_value_to_select)
+            checked_all_set.add(leaf_value_to_select)
 
-        st.success("Variable added and selected.")
-        st.rerun()
+            st.session_state["checked"] = sorted(list(checked_set))
+            st.session_state["checked_all_list"] = sorted(list(checked_all_set))
+
+            st.success("Variable added and selected.")
+            st.rerun()
 
 st.markdown("---")
 render_bottom_nav(current_step=3)
