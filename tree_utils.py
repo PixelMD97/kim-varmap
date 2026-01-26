@@ -79,3 +79,10 @@ def build_nodes_and_lookup(df):
         nodes.append(os_node)
 
     return nodes, leaf_lookup
+
+def compute_row_key_from_df_row(row: dict, dedup_cols: list[str]) -> str:
+    """
+    Compute the same stable __row_key__ that build_nodes_and_lookup uses,
+    based on the same dedup_cols definition.
+    """
+    return _make_row_key(row, dedup_cols)
