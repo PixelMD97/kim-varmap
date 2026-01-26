@@ -22,18 +22,13 @@ def reset_overlay():
     st.rerun()
 
 
-# -----------------------------
-# Header
-# -----------------------------
+# ---- Header (minimal) ----
 st.title("Data source")
 st.caption("Choose how you want to define the variable mapping for this session.")
 
-# -----------------------------
-# Status (always visible)
-# -----------------------------
+# ---- Status (only show the actual state; keep it short) ----
 overlay_df = st.session_state.get("overlay_df")
 has_overlay = overlay_df is not None and len(overlay_df) > 0
-
 total_rows = len(get_master_df())
 
 if has_overlay:
@@ -41,16 +36,9 @@ if has_overlay:
 else:
     st.info(f"Current dataset: **Base mapping**  \nTotal rows: **{total_rows}**")
 
-last_summary = st.session_state.get("last_import_summary")
-if last_summary:
-    added, updated, skipped = last_summary
-    st.caption(f"Last upload — Added: {added} | Updated: {updated} | Skipped: {skipped}")
+st.markdown("")
 
-st.markdown("---")
-
-# -----------------------------
-# Setup choice
-# -----------------------------
+# ---- Setup choice ----
 st.subheader("Variable mapping setup")
 st.caption("Select how you want to define the mapping before choosing variables.")
 
@@ -65,23 +53,35 @@ choice = st.radio(
     label_visibility="collapsed",
 )
 
-# -----------------------------
-# Option: Standard mapping
-# -----------------------------
-if choice.startswith("Use standard"):
-    st.write("The centrally maintained base mapping will be used. No upload is required.")
+# Small grey description next to the option (your request)
+st.markdown(
+    """
+<style>
+.kim-small-grey { color: rgba(49, 51, 63, 0.65); font-size: 0.9rem; }
+</style>
+""",
+    unsafe_allow_html=True,
+)
 
+if choice.startswith("Use standard"):
+    st.markdown(
+        "<div class='kim-small-grey'>The centrally maintained base mapping will be used. No upload is required.</div>",
+        unsafe_allow_html=True,
+    )
+
+    # only show reset if there is an overlay
     if has_overlay:
-        st.warning("An uploaded overlay is currently active.")
+        st.markdown("")
         if st.button("Reset upload (back to base mapping)", use_container_width=False):
             reset_overlay()
 
-# -----------------------------
-# Option: Upload CSV overlay
-# -----------------------------
 else:
-    st.write("Add or update variables by uploading your own mapping file.")
+    st.markdown(
+        "<div class='kim-small-grey'>Upload a CSV to add/update mappings for this session.</div>",
+        unsafe_allow_html=True,
+    )
 
+    st.markdown("")
     st.markdown("**Upload rules**")
     st.markdown(
         """
@@ -118,10 +118,11 @@ else:
         except Exception as e:
             st.error(f"Import failed: {e}")
 
-    # If overlay exists, allow reset (even if user doesn't re-upload)
+    # show reset if overlay exists
     overlay_df = st.session_state.get("overlay_df")
     has_overlay = overlay_df is not None and len(overlay_df) > 0
     if has_overlay:
+        st.markdown("")
         if st.button("Reset upload", use_container_width=False):
             reset_overlay()
 
