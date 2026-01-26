@@ -33,7 +33,7 @@ with right:
     is_saved = bool(project_name_input.strip())
     if is_saved:
         st.markdown(
-            "<div style='text-align:right; color: rgba(49,51,63,0.65); font-size: 0.95rem;'>✓ saved</div>",
+            "<div style='text-align:right; color: rgba(49,51,63,0.65); font-size: 0.95rem;'>✓ </div>",
             unsafe_allow_html=True,
         )
 
