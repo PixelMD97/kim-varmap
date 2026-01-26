@@ -1,28 +1,34 @@
 import streamlit as st
 
 _STEP_PAGES = {
-    0: ("Overview", "pages/0_overview.py"),
-    1: ("Data source", "pages/0_loadfrom.py"),
-    2: ("Choose variables", "pages/1_tree.py"),
-    3: ("Export", "pages/2_table_checked.py"),
+    0: ("Overview", "pages/1_overview.py"),
+    1: ("Data source", "pages/2_data_source.py"),
+    2: ("Choose variables", "pages/3_choose_variable.py"),
+    3: ("Export", "pages/4_export.py"),
 }
+
 
 def render_stepper(current_step: int):
     steps_order = [0, 1, 2, 3]
 
     def label_for(step_number: int, title: str) -> str:
-        if step_number < current_step:
+        if step_number <= current_step:
+            # active or completed
             return f"**{title}**" if step_number == 0 else f"**{step_number}. {title}**"
-        if step_number == current_step:
-            return f"**{title}**" if step_number == 0 else f"**{step_number}. {title}**"
-        return f"⬜ {title}" if step_number == 0 else f"⬜ {step_number}. {title}"
+        else:
+            # future
+            return f"⬜ {title}" if step_number == 0 else f"⬜ {step_number}. {title}"
 
     cols = st.columns([1.2, 1.2, 1.8, 1.0])
     for col, step_number in zip(cols, steps_order):
         title, _ = _STEP_PAGES[step_number]
         col.markdown(label_for(step_number, title))
 
-    st.markdown("<hr style='margin: 0.6rem 0 1.0rem 0; opacity: 0.25;'>", unsafe_allow_html=True)
+    st.markdown(
+        "<hr style='margin: 0.6rem 0 1.0rem 0; opacity: 0.25;'>",
+        unsafe_allow_html=True,
+    )
+
 
 def render_bottom_nav(current_step: int):
     back_step = current_step - 1 if current_step > 0 else None
