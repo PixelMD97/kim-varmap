@@ -17,7 +17,7 @@ def render_stepper(current_step: int):
             return f"**{title}**" if step_number == 0 else f"**{step_number}. {title}**"
         else:
             # future
-            return f"⬜ {title}" if step_number == 0 else f"⬜ {step_number}. {title}"
+            return f"⬜ {title}" if step_number == 0 else f"{step_number}. {title}"
 
     cols = st.columns([1.2, 1.2, 1.8, 1.0])
     for col, step_number in zip(cols, steps_order):
