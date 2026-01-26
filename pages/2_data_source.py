@@ -65,7 +65,7 @@ st.markdown(
 
 if choice.startswith("Use standard"):
     st.markdown(
-        "<div class='kim-small-grey'>The centrally maintained base mapping will be used. No upload is required.</div>",
+        "<div class='kim-small-grey'>NOTE: For the "Standard Mapping", the centrally maintained base mapping will be used. No upload is required.</div>",
         unsafe_allow_html=True,
     )
 
