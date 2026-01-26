@@ -7,5 +7,4 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Optional: keep completely empty, or a tiny hint:
-st.markdown("Go to **Overview** in the sidebar.")
+# Intentionally blank main page.
