@@ -25,7 +25,7 @@ with left:
         "Project name",
         value=st.session_state.get("project_name", ""),
         key="project_name_input",
-        placeholder="e.g., PEGASUS, Crystal Brain, Frailty ICU…",
+        placeholder="e.g., TEST STUDY …",
     )
 
 with right:
