@@ -61,10 +61,6 @@ with ctrl_cols[0]:
         st.session_state["expanded"] = all_expand_values
         st.rerun()
 
-with ctrl_cols[1]:
-    if st.button("Collapse all", use_container_width=True):
-        st.session_state["expanded"] = []
-        st.rerun()
 
 # ---- tree ----
 selected = tree_select(
