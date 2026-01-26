@@ -1,13 +1,11 @@
 import streamlit as st
 
-_STEP_PAGES = {
-    0: ("Overview", "pages/1_overview.py"),
-    1: ("Data source", "pages/2_data_source.py"),
-    2: ("Choose variables", "pages/3_choose_variable.py"),
-    3: ("Export", "pages/4_export.py"),
+_STEP_LABELS = {
+    0: "Overview",
+    1: "1. Data source",
+    2: "2. Choose variables",
+    3: "3. Export",
 }
-
- 
 
 def render_stepper(current_step: int):
     st.markdown(
@@ -19,6 +17,9 @@ def render_stepper(current_step: int):
             border-bottom: 1px solid rgba(49,51,63,0.08);
             margin-bottom: 1.2rem;
         }
+        .step-inactive {
+            color: rgba(49,51,63,0.55);
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -28,12 +29,16 @@ def render_stepper(current_step: int):
 
     cols = st.columns([1.2, 1.2, 1.8, 1.0])
 
-    labels = ["Overview", "1. Data source", "2. Choose variables", "3. Export"]
+    for step, col in zip([0, 1, 2, 3], cols):
+        label = _STEP_LABELS[step]
 
-    for col, label in zip(cols, labels):
-        col.markdown(f"**{label}**" if label.startswith(str(current_step)) else label)
+        if step == current_step:
+            col.markdown(f"**{label}**")
+        else:
+            col.markdown(f"<span class='step-inactive'>{label}</span>", unsafe_allow_html=True)
 
     st.markdown("</div>", unsafe_allow_html=True)
+
 
 
 def render_bottom_nav(current_step: int):
