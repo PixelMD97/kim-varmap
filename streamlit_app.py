@@ -7,4 +7,4 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Intentionally blank main page.
+st.switch_page("pages/1_overview.py")
