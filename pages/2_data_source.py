@@ -91,9 +91,10 @@ st.markdown("")  # space
 # ---------- option: standard ----------
 if choice.startswith("Use standard"):
     st.markdown(
-        "<div class='kim-small-grey-inline'>NOTE: For the "Standard Mapping", the centrally maintained base mapping will be used. No upload is required.</div>",
-        unsafe_allow_html=True,
-    )
+    '<div class="kim-small-grey-inline">For the "Standard Mapping", the centrally maintained base mapping will be used. No upload is required.</div>',
+    unsafe_allow_html=True,
+)
+ 
 
     # show reset only if overlay exists
     if has_overlay:
