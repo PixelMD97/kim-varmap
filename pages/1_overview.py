@@ -16,15 +16,30 @@ st.caption(
     "A lightweight tool to browse, select, and export clinical variables "
     "with the corresponding EPIC/PDMS mapping."
 )
-
 st.markdown("### Project information")
-project_name = st.text_input(
-    "Project name"
-)
+
+left, right = st.columns([6, 1])
+
+with left:
+    project_name_input = st.text_input(
+        "Project name",
+        value=st.session_state.get("project_name", ""),
+        key="project_name_input",
+        placeholder="e.g., PEGASUS, Crystal Brain, Frailty ICU…",
+    )
+
+with right:
+    st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)  # align vertically
+    is_saved = bool(project_name_input.strip())
+    if is_saved:
+        st.markdown(
+            "<div style='text-align:right; color: rgba(49,51,63,0.65); font-size: 0.95rem;'>✓ saved</div>",
+            unsafe_allow_html=True,
+        )
 
 # store centrally for later steps
-if project_name:
-    st.session_state["project_name"] = project_name.strip()
+if project_name_input.strip():
+    st.session_state["project_name"] = project_name_input.strip()
 
 st.markdown("### How it works")
 st.markdown(
