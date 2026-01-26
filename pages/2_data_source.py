@@ -115,7 +115,7 @@ else:
     st.markdown(
         """
 - **Required:** `Variable` must be present and non-empty  
-- **Supported:** add new variables; update existing variables (**exact match only**)  
+- **Supported:** add new variables
 - **Not supported:** deleting base variables; ambiguous updates
 """
     )
