@@ -1,7 +1,15 @@
 import streamlit as st
 from ui_stepper import render_stepper
 
+st.set_page_config(
+    page_title="KIM VarMap – Overview",
+    page_icon="🧠",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
 render_stepper(current_step=0)
+
 
 st.title("KIM VarMap")
 st.caption(
@@ -34,5 +42,5 @@ st.markdown(
 )
 
 st.markdown("---")
-
-st.page_link("pages/0_loadfrom.py", label="Start →", use_container_width=True)
+ 
+st.page_link("pages/2_data_source.py", label="Start →", use_container_width=True)
