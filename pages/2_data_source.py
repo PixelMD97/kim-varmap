@@ -24,20 +24,7 @@ def reset_overlay():
 
 # ---- Header (minimal) ----
 st.title("Data source")
-st.caption("Choose how you want to define the variable mapping for this session.")
-
-# ---- Status (only show the actual state; keep it short) ----
-overlay_df = st.session_state.get("overlay_df")
-has_overlay = overlay_df is not None and len(overlay_df) > 0
-total_rows = len(get_master_df())
-
-if has_overlay:
-    st.success(f"Current dataset: **Base mapping + uploaded overlay**  \nTotal rows: **{total_rows}**")
-else:
-    st.info(f"Current dataset: **Base mapping**  \nTotal rows: **{total_rows}**")
-
-st.markdown("")
-
+ 
 # ---- Setup choice ----
 st.subheader("Variable mapping setup")
 st.caption("Select how you want to define the mapping before choosing variables.")
