@@ -4,6 +4,8 @@ from datetime import datetime
 
 from ui_stepper import render_stepper, render_bottom_nav
 from data_store import get_master_df, upsert_overlay_from_upload
+from tree_utils import build_nodes_and_lookup
+
 
 st.set_page_config(
     page_title="KIM VarMap – Export",
@@ -22,32 +24,15 @@ if project_name:
     st.markdown(f"Project: **{project_name}**")
 
 
-def load_selection_from_query_params_if_needed():
-    if "selected_row_keys" in st.session_state and st.session_state["selected_row_keys"]:
-        return
-
-    sel = st.query_params.get("sel")
-    if not sel:
-        if "selected_row_keys" not in st.session_state:
-            st.session_state["selected_row_keys"] = set()
-        return
-
-    if isinstance(sel, list):
-        sel = sel[0] if sel else ""
-
-    sel = str(sel).strip()
-    keys = [k.strip() for k in sel.split(",") if k.strip()]
-    st.session_state["selected_row_keys"] = set(keys)
-
-
-def write_selection_to_query_params(selected_row_keys: set[str]):
-    if selected_row_keys:
-        st.query_params["sel"] = ",".join(sorted(selected_row_keys))
-    else:
-        try:
-            del st.query_params["sel"]
-        except Exception:
-            pass
+def refresh_master_lookup():
+    df_master = get_master_df()
+    df_master_for_tree = df_master.drop(
+        columns=[c for c in df_master.columns if str(c).startswith("__")],
+        errors="ignore",
+    )
+    _, leaf_lookup_master = build_nodes_and_lookup(df_master_for_tree)
+    st.session_state["leaf_lookup_master"] = leaf_lookup_master
+    return leaf_lookup_master
 
 
 def build_export_view(df_selected: pd.DataFrame) -> pd.DataFrame:
@@ -67,36 +52,31 @@ def build_export_view(df_selected: pd.DataFrame) -> pd.DataFrame:
     df_out.loc[df_out["user_uploaded_at"].notna(), "Origin"] = "User upload"
     df_out.loc[df_out["user_created"] == True, "Origin"] = "User created"
 
+    # Visible columns
     preferred = ["Variable", "Organ System", "Group", "Source", "EPIC ID", "PDMS ID", "Unit", "Origin"]
     cols = [c for c in preferred if c in df_out.columns]
 
+    # Append other non-provenance columns (optional)
     hide_these = {"user_created", "user_uploaded_at"}
     extras = [c for c in df_out.columns if c not in cols and c not in hide_these]
 
     return df_out[cols + extras]
 
 
-# -----------------------------
-# selection state
-# -----------------------------
-if "selected_row_keys" not in st.session_state:
-    st.session_state["selected_row_keys"] = set()
+# Ensure lookup exists even if user jumps directly to Export
+leaf_lookup_master = st.session_state.get("leaf_lookup_master")
+if not leaf_lookup_master:
+    leaf_lookup_master = refresh_master_lookup()
 
-load_selection_from_query_params_if_needed()
+checked = st.session_state.get("checked", [])
+selected_rows = [leaf_lookup_master[v] for v in checked if v in leaf_lookup_master]
 
-
-# -----------------------------
-# Selected variables table
-# -----------------------------
 st.subheader("Selected variables")
 
-master_df = get_master_df()
-selected_keys = st.session_state["selected_row_keys"]
-
-if not selected_keys:
+if not selected_rows:
     st.info("No variables selected yet. Go to **Choose variables** and select some items.")
 else:
-    selected_df_raw = master_df[master_df["__row_key__"].astype(str).isin(set(map(str, selected_keys)))].copy()
+    selected_df_raw = pd.DataFrame(selected_rows)
     export_view = build_export_view(selected_df_raw)
 
     st.dataframe(export_view, use_container_width=True, hide_index=True)
@@ -116,9 +96,6 @@ else:
 
 st.markdown("---")
 
-# -----------------------------
-# Add variable
-# -----------------------------
 st.subheader("Add a variable")
 st.markdown("Add a custom variable here. It will be appended to your selected variables above.")
 
@@ -159,19 +136,41 @@ if submitted:
         }
 
         upload_df = pd.DataFrame([new_row])
-        added, updated, skipped, processed_df = upsert_overlay_from_upload(upload_df)
+        upsert_overlay_from_upload(upload_df)
 
-        # Select newly created/updated rows by stable __row_key__
-        new_keys = processed_df["__row_key__"].astype(str).tolist()
+        # Refresh lookup so export can immediately display the new row
+        leaf_lookup_master = refresh_master_lookup()
 
-        selected_keys = set(st.session_state.get("selected_row_keys", set()))
-        selected_keys.update(new_keys)
+        # Select it globally (NEW leaf IDs include |row_key)
+        checked_set = set(st.session_state.get("checked", []))
+        checked_all_set = set(st.session_state.get("checked_all_list", []))
 
-        st.session_state["selected_row_keys"] = selected_keys
-        write_selection_to_query_params(selected_keys)
+        # Find the leaf value that matches the new row in the refreshed lookup
+        leaf_value_to_select = None
+        for leaf_value, row_dict in leaf_lookup_master.items():
+            if (
+                str(row_dict.get("Variable", "")).strip() == variable_clean
+                and str(row_dict.get("Organ System", "")).strip() == organ_system_clean
+                and str(row_dict.get("Group", "")).strip() == group_clean
+                and str(row_dict.get("Source", "")).strip() == str(source).strip()
+                and str(row_dict.get("EPIC ID", "")).strip() == epic_id.strip()
+                and str(row_dict.get("PDMS ID", "")).strip() == pdms_id.strip()
+                and str(row_dict.get("Unit", "")).strip() == unit_clean
+            ):
+                leaf_value_to_select = leaf_value
+                break
 
-        st.success("Variable added and selected.")
-        st.rerun()
+        if leaf_value_to_select is None:
+            st.warning("Variable added, but could not auto-select it in the tree. Please select it manually.")
+        else:
+            checked_set.add(leaf_value_to_select)
+            checked_all_set.add(leaf_value_to_select)
+
+            st.session_state["checked"] = sorted(list(checked_set))
+            st.session_state["checked_all_list"] = sorted(list(checked_all_set))
+
+            st.success("Variable added and selected.")
+            st.rerun()
 
 st.markdown("---")
 render_bottom_nav(current_step=3)
