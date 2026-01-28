@@ -131,9 +131,7 @@ if not leaf_lookup_master:
 # -----------------------------
 # Selected variables
 # -----------------------------
-st.write("DEBUG checked count:", len(st.session_state.get("checked", [])))
-st.write("DEBUG checked sample:", st.session_state.get("checked", [])[:5])
-
+ 
 checked = st.session_state.get("checked", [])
 selected_rows = [leaf_lookup_master[v] for v in checked if v in leaf_lookup_master]
 
@@ -207,29 +205,30 @@ if submitted:
         }
 
         upload_df = pd.DataFrame([new_row])
-        upsert_overlay_from_upload(upload_df)
+        added, updated, skipped, processed_df = upsert_overlay_from_upload(upload_df)
 
-        # Refresh lookup so export can immediately display the new row
-        leaf_lookup_master = refresh_master_lookup()
+        # processed_df contains __row_key__ (stable)
+        if "__row_key__" not in processed_df.columns or processed_df.empty:
+            st.warning("Variable added, but could not determine row key for auto-selection.")
+        else:
+            new_keys = processed_df["__row_key__"].astype(str).tolist()
+            new_leaf_values = [f"ROW:{k}" for k in new_keys]
+        
+            checked_set = set(st.session_state.get("checked", []))
+            checked_all_set = set(st.session_state.get("checked_all_list", []))
+        
+            checked_set.update(new_leaf_values)
+            checked_all_set.update(new_leaf_values)
+        
+            st.session_state["checked"] = sorted(checked_set)
+            st.session_state["checked_all_list"] = sorted(checked_all_set)
+        
+            # refresh lookup so it appears immediately
+            leaf_lookup_master = refresh_master_lookup()
+        
+            st.success("Variable added and selected.")
+            st.rerun()
 
-        # Keep prior selections + select the new row
-        checked_set = set(st.session_state.get("checked", []))
-        checked_all_set = set(st.session_state.get("checked_all_list", []))
-
-        # Find the leaf value that matches the new row in the refreshed lookup
-        leaf_value_to_select = None
-        for leaf_value, row_dict in leaf_lookup_master.items():
-            if (
-                str(row_dict.get("Variable", "")).strip() == variable_clean
-                and str(row_dict.get("Organ System", "")).strip() == organ_system_clean
-                and str(row_dict.get("Group", "")).strip() == group_clean
-                and str(row_dict.get("Source", "")).strip() == str(source).strip()
-                and str(row_dict.get("EPIC ID", "")).strip() == epic_id.strip()
-                and str(row_dict.get("PDMS ID", "")).strip() == pdms_id.strip()
-                and str(row_dict.get("Unit", "")).strip() == unit_clean
-            ):
-                leaf_value_to_select = leaf_value
-                break
 
         if leaf_value_to_select is None:
             st.warning("Variable added, but could not auto-select it in the tree. Please select it manually.")
