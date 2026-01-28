@@ -1,3 +1,4 @@
+# pages/3_choose_variable.py
 import streamlit as st
 from streamlit_tree_select import tree_select
 
@@ -26,7 +27,9 @@ if project_name:
     st.markdown(f"Project: **{project_name}**")
 
 
-# ---- helpers ----
+# -----------------------------
+# helpers
+# -----------------------------
 def reset_tree_widget_state():
     # tree_select stores its internal state under the widget key
     if "var_tree" in st.session_state:
@@ -46,26 +49,81 @@ def compute_all_expand_values(tree_nodes):
     return sorted([v for v in expanded_values if v is not None])
 
 
-# ---- state init ----
+def normalize_checked_values_to_row_format(checked_values: list) -> list[str]:
+    """
+    Convert any legacy leaf values to the new stable format.
+
+    New format:  "ROW:<__row_key__>"
+    Old format:  "<os>/<group>/<var>|<row_key>"
+
+    We keep only:
+    - values starting with ROW:
+    - OR convert legacy values that contain a trailing "|<row_key>"
+    """
+    normalized = []
+
+    for v in checked_values or []:
+        if not isinstance(v, str):
+            continue
+
+        v = v.strip()
+        if not v:
+            continue
+
+        # already new format
+        if v.startswith("ROW:"):
+            normalized.append(v)
+            continue
+
+        # legacy format: "...|<row_key>"
+        if "|" in v:
+            maybe_row_key = v.split("|")[-1].strip()
+            if maybe_row_key:
+                normalized.append(f"ROW:{maybe_row_key}")
+            continue
+
+        # everything else is ignored (OS:..., GR:..., etc.)
+    # de-dup while preserving order
+    seen = set()
+    out = []
+    for x in normalized:
+        if x not in seen:
+            out.append(x)
+            seen.add(x)
+    return out
+
+
+# -----------------------------
+# state init (keep old keys)
+# -----------------------------
 if "checked_all_list" not in st.session_state:
     st.session_state["checked_all_list"] = []
+if "checked" not in st.session_state:
+    st.session_state["checked"] = []
 if "expanded" not in st.session_state:
     st.session_state["expanded"] = []
 
+# normalize once on load so older sessions don't break
+st.session_state["checked_all_list"] = normalize_checked_values_to_row_format(st.session_state["checked_all_list"])
+st.session_state["checked"] = normalize_checked_values_to_row_format(st.session_state["checked"])
 
-# ---- load + build tree ----
+
+# -----------------------------
+# load + build tree
+# IMPORTANT: do NOT drop __row_key__ anymore
+# -----------------------------
 df_master = get_master_df()
-df_master_for_tree = df_master.drop(
-    columns=[c for c in df_master.columns if str(c).startswith("__")],
-    errors="ignore",
-)
-nodes, leaf_lookup_master = build_nodes_and_lookup(df_master_for_tree)
+nodes, leaf_lookup_master = build_nodes_and_lookup(df_master)
+
+# store lookup for other pages if they still rely on it
 st.session_state["leaf_lookup_master"] = leaf_lookup_master
 
 all_expand_values = compute_all_expand_values(nodes)
 
 
-# ---- controls row ----
+# -----------------------------
+# controls row
+# -----------------------------
 ctrl_cols = st.columns([1, 1, 6])
 
 with ctrl_cols[0]:
@@ -81,7 +139,9 @@ with ctrl_cols[1]:
         st.rerun()
 
 
-# ---- tree ----
+# -----------------------------
+# tree
+# -----------------------------
 selected = tree_select(
     nodes,
     checked=st.session_state["checked_all_list"],
@@ -92,8 +152,11 @@ selected = tree_select(
 checked_now = selected.get("checked", [])
 expanded_now = selected.get("expanded", [])
 
-st.session_state["checked_all_list"] = checked_now
-st.session_state["checked"] = checked_now  # used by export
+# normalize checked output too (defensive)
+checked_now_normalized = normalize_checked_values_to_row_format(checked_now)
+
+st.session_state["checked_all_list"] = checked_now_normalized
+st.session_state["checked"] = checked_now_normalized  # used by export
 st.session_state["expanded"] = expanded_now
 
 
