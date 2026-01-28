@@ -131,7 +131,6 @@ if not leaf_lookup_master:
 # -----------------------------
 # Selected variables
 # -----------------------------
- 
 checked = st.session_state.get("checked", [])
 selected_rows = [leaf_lookup_master[v] for v in checked if v in leaf_lookup_master]
 
@@ -207,42 +206,26 @@ if submitted:
         upload_df = pd.DataFrame([new_row])
         added, updated, skipped, processed_df = upsert_overlay_from_upload(upload_df)
 
-        # processed_df contains __row_key__ (stable)
-        if "__row_key__" not in processed_df.columns or processed_df.empty:
+        if processed_df is None or processed_df.empty or "__row_key__" not in processed_df.columns:
             st.warning("Variable added, but could not determine row key for auto-selection.")
         else:
             new_keys = processed_df["__row_key__"].astype(str).tolist()
             new_leaf_values = [f"ROW:{k}" for k in new_keys]
-        
+
             checked_set = set(st.session_state.get("checked", []))
             checked_all_set = set(st.session_state.get("checked_all_list", []))
-        
+
             checked_set.update(new_leaf_values)
             checked_all_set.update(new_leaf_values)
-        
+
             st.session_state["checked"] = sorted(checked_set)
             st.session_state["checked_all_list"] = sorted(checked_all_set)
-        
+
             # refresh lookup so it appears immediately
-            leaf_lookup_master = refresh_master_lookup()
-        
-            st.success("Variable added and selected.")
-            st.rerun()
-
-
-        if leaf_value_to_select is None:
-            st.warning("Variable added, but could not auto-select it in the tree. Please select it manually.")
-        else:
-            # leaf_value_to_select will be "ROW:<row_key>" now
-            checked_set.add(leaf_value_to_select)
-            checked_all_set.add(leaf_value_to_select)
-
-            st.session_state["checked"] = sorted(list(checked_set))
-            st.session_state["checked_all_list"] = sorted(list(checked_all_set))
+            refresh_master_lookup()
 
             st.success("Variable added and selected.")
             st.rerun()
 
 st.markdown("---")
 render_bottom_nav(current_step=3)
-
