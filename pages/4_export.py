@@ -1,3 +1,4 @@
+# pages/4_export.py
 import pandas as pd
 import streamlit as st
 from datetime import datetime
@@ -24,15 +25,58 @@ if project_name:
     st.markdown(f"Project: **{project_name}**")
 
 
+# -----------------------------
+# helpers
+# -----------------------------
 def refresh_master_lookup():
+    """
+    Rebuild a lookup from the current master df.
+
+    IMPORTANT:
+    - With the updated tree_utils.py, build_nodes_and_lookup requires __row_key__.
+    - Do NOT drop __ columns here anymore.
+    """
     df_master = get_master_df()
-    df_master_for_tree = df_master.drop(
-        columns=[c for c in df_master.columns if str(c).startswith("__")],
-        errors="ignore",
-    )
-    _, leaf_lookup_master = build_nodes_and_lookup(df_master_for_tree)
+    _, leaf_lookup_master = build_nodes_and_lookup(df_master)
     st.session_state["leaf_lookup_master"] = leaf_lookup_master
     return leaf_lookup_master
+
+
+def normalize_checked_values_to_row_format(checked_values: list) -> list[str]:
+    """
+    Convert any legacy leaf values to the new stable format.
+
+    New format:  "ROW:<__row_key__>"
+    Old format:  "<os>/<group>/<var>|<row_key>"
+    """
+    normalized = []
+
+    for v in checked_values or []:
+        if not isinstance(v, str):
+            continue
+
+        v = v.strip()
+        if not v:
+            continue
+
+        if v.startswith("ROW:"):
+            normalized.append(v)
+            continue
+
+        if "|" in v:
+            maybe_row_key = v.split("|")[-1].strip()
+            if maybe_row_key:
+                normalized.append(f"ROW:{maybe_row_key}")
+            continue
+
+    # de-dup while preserving order
+    seen = set()
+    out = []
+    for x in normalized:
+        if x not in seen:
+            out.append(x)
+            seen.add(x)
+    return out
 
 
 def build_export_view(df_selected: pd.DataFrame) -> pd.DataFrame:
@@ -63,11 +107,30 @@ def build_export_view(df_selected: pd.DataFrame) -> pd.DataFrame:
     return df_out[cols + extras]
 
 
+# -----------------------------
+# ensure state keys exist
+# -----------------------------
+if "checked" not in st.session_state:
+    st.session_state["checked"] = []
+if "checked_all_list" not in st.session_state:
+    st.session_state["checked_all_list"] = []
+
+# normalize (handles users who still have legacy leaf values in state)
+st.session_state["checked"] = normalize_checked_values_to_row_format(st.session_state["checked"])
+st.session_state["checked_all_list"] = normalize_checked_values_to_row_format(st.session_state["checked_all_list"])
+
+
+# -----------------------------
 # Ensure lookup exists even if user jumps directly to Export
+# -----------------------------
 leaf_lookup_master = st.session_state.get("leaf_lookup_master")
 if not leaf_lookup_master:
     leaf_lookup_master = refresh_master_lookup()
 
+
+# -----------------------------
+# Selected variables
+# -----------------------------
 checked = st.session_state.get("checked", [])
 selected_rows = [leaf_lookup_master[v] for v in checked if v in leaf_lookup_master]
 
@@ -96,6 +159,10 @@ else:
 
 st.markdown("---")
 
+
+# -----------------------------
+# Add a variable
+# -----------------------------
 st.subheader("Add a variable")
 st.markdown("Add a custom variable here. It will be appended to your selected variables above.")
 
@@ -115,6 +182,7 @@ with st.form("add_variable_form", clear_on_submit=True):
         unit_other = st.text_input("Other unit", placeholder="e.g. U/L")
 
     submitted = st.form_submit_button("Add variable")
+
 
 if submitted:
     variable_clean = variable.strip()
@@ -141,7 +209,7 @@ if submitted:
         # Refresh lookup so export can immediately display the new row
         leaf_lookup_master = refresh_master_lookup()
 
-        # Select it globally (NEW leaf IDs include |row_key)
+        # Keep prior selections + select the new row
         checked_set = set(st.session_state.get("checked", []))
         checked_all_set = set(st.session_state.get("checked_all_list", []))
 
@@ -163,6 +231,7 @@ if submitted:
         if leaf_value_to_select is None:
             st.warning("Variable added, but could not auto-select it in the tree. Please select it manually.")
         else:
+            # leaf_value_to_select will be "ROW:<row_key>" now
             checked_set.add(leaf_value_to_select)
             checked_all_set.add(leaf_value_to_select)
 
