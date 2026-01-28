@@ -131,6 +131,9 @@ if not leaf_lookup_master:
 # -----------------------------
 # Selected variables
 # -----------------------------
+st.write("DEBUG checked count:", len(st.session_state.get("checked", [])))
+st.write("DEBUG checked sample:", st.session_state.get("checked", [])[:5])
+
 checked = st.session_state.get("checked", [])
 selected_rows = [leaf_lookup_master[v] for v in checked if v in leaf_lookup_master]
 
@@ -243,3 +246,4 @@ if submitted:
 
 st.markdown("---")
 render_bottom_nav(current_step=3)
+
