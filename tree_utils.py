@@ -19,19 +19,11 @@ def build_nodes_and_lookup(df):
         if col in df.columns:
             df[col] = df[col].fillna("Unknown").astype(str)
 
-    # columns that define a row (exclude internal __ cols)
-    dedup_cols = [c for c in df.columns if not str(c).startswith("__")]
+    if "__row_key__" not in df.columns:
+        raise ValueError("Expected '__row_key__' in dataframe. Use data_store.get_master_df().")
 
-    # drop ONLY exact duplicates
-    df = df.drop_duplicates(subset=dedup_cols)
-
-    # assign stable row keys
-    row_keys = []
-    for _, row in df.iterrows():
-        rk = _make_row_key(row.to_dict(), dedup_cols)
-        row_keys.append(rk)
-
-    df["__row_key__"] = row_keys
+    # ensure unique rows by row key (overlay may contain duplicates pre-merge)
+    df = df.drop_duplicates(subset=["__row_key__"], keep="last")
 
     nodes = []
     leaf_lookup = {}
@@ -41,36 +33,32 @@ def build_nodes_and_lookup(df):
     for os_name, os_df in df_sorted.groupby("Organ System"):
         os_node = {
             "label": os_name,
-            "value": os_name,
+            "value": f"OS:{os_name}",
             "children": [],
         }
 
         for group_name, group_df in os_df.groupby("Group"):
             group_node = {
                 "label": group_name,
-                "value": f"{os_name}/{group_name}",
+                "value": f"GR:{os_name}/{group_name}",
                 "children": [],
             }
 
             for _, row in group_df.iterrows():
                 var = row["Variable"]
-                row_key = row["__row_key__"]
+                row_key = str(row["__row_key__"])
 
-                # build human-readable label
+                # label
                 label_parts = [var]
                 source = row.get("Source")
                 if source:
                     label_parts.append(f"({source})")
-
                 label = " ".join(label_parts)
 
-                leaf_value = f"{os_name}/{group_name}/{var}|{row_key}"
+                # IMPORTANT: leaf value must be stable and independent of columns
+                leaf_value = f"ROW:{row_key}"
 
-                leaf = {
-                    "label": label,
-                    "value": leaf_value,
-                }
-
+                leaf = {"label": label, "value": leaf_value}
                 group_node["children"].append(leaf)
                 leaf_lookup[leaf_value] = row.to_dict()
 
@@ -79,6 +67,7 @@ def build_nodes_and_lookup(df):
         nodes.append(os_node)
 
     return nodes, leaf_lookup
+
 
 def compute_row_key_from_df_row(row: dict, dedup_cols: list[str]) -> str:
     """
