@@ -1,3 +1,14 @@
+# Test 
+from api_client import api_is_configured, healthcheck
+import streamlit as st
+
+st.write("API configured:", api_is_configured())
+ok, msg = healthcheck()
+st.write("Health:", ok, msg)
+
+
+
+
 import streamlit as st
 import pandas as pd
 
