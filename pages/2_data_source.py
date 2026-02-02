@@ -201,3 +201,5 @@ else:
 
 st.markdown("---")
 render_bottom_nav(current_step=1)
+
+# add something, if you want to send us data mappings, please do so at email xxx. thank you (or upload?) 
