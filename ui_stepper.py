@@ -8,7 +8,7 @@ _STEP_PAGES = {
     1: ("Data source", "pages/2_data_source.py"),
     2: ("Data source system", "pages/2b_system_selection.py"),
     3: ("Choose variables", "pages/3_choose_variable.py"),
-    4: ("Granularity", "pages/granularity.py"),
+    4: ("Granularity", "pages/3_b_granularity.py"),
     5: ("Export", "pages/4_export.py"),
 }
 
