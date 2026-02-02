@@ -20,7 +20,12 @@ render_stepper(current_step=5)
 st.title("Export")
 st.markdown("Review your selected variables and download them as a CSV.")
 
-project_name = st.session_state.get("project_name", "").strip()
+project_name = (
+    st.session_state.get("project_meta", {})
+    .get("project_name", "")
+    .strip()
+)
+
 if project_name:
     st.markdown(f"Project: **{project_name}**")
 
@@ -28,6 +33,28 @@ if project_name:
 # -----------------------------
 # helpers
 # -----------------------------
+
+def attach_granularity(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Attach granularity metadata from session_state to export df.
+    """
+    gran_cfg = st.session_state.get("granularity_config", {})
+
+    def _get(row_key, field, default=""):
+        return gran_cfg.get(row_key, {}).get(field, default)
+
+    df = df.copy()
+    df["Aggregation"] = df["__row_key__"].apply(lambda k: _get(k, "aggregation"))
+    df["Time anchor"] = df["__row_key__"].apply(lambda k: _get(k, "time_anchor"))
+    df["Time window"] = df["__row_key__"].apply(lambda k: _get(k, "time_window"))
+    df["Allow duplicates"] = df["__row_key__"].apply(
+        lambda k: _get(k, "allow_duplicates", False)
+    )
+
+    return df
+
+
+
 def refresh_master_lookup():
     """
     Rebuild a lookup from the current master df.
@@ -140,7 +167,12 @@ if not selected_rows:
     st.info("No variables selected yet. Go to **Choose variables** and select some items.")
 else:
     selected_df_raw = pd.DataFrame(selected_rows)
-    export_view = build_export_view(selected_df_raw)
+
+    # attach granularity BEFORE hiding __ columns
+    selected_df_with_gran = attach_granularity(selected_df_raw)
+    
+    export_view = build_export_view(selected_df_with_gran)
+
 
     st.dataframe(export_view, use_container_width=True, hide_index=True)
 
@@ -159,7 +191,22 @@ else:
 
 st.markdown("---")
 
-# delete a variable  froM; UI / selection. not delete in df. (trash can in table maybe?) or somehow else 
+st.subheader("Remove selected variables")
+
+remove_choices = st.multiselect(
+    "Remove variables from selection",
+    options=checked,
+    format_func=lambda v: leaf_lookup_master[v]["Variable"]
+    if v in leaf_lookup_master else v,
+)
+
+if remove_choices:
+    st.session_state["checked"] = [
+        v for v in st.session_state["checked"] if v not in remove_choices
+    ]
+    st.session_state["checked_all_list"] = st.session_state["checked"]
+    st.success(f"Removed {len(remove_choices)} variable(s) from selection.")
+    st.rerun()
 
 
 # -----------------------------
