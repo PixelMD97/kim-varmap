@@ -7,7 +7,7 @@ _STEP_PAGES = {
     3: ("Export", "pages/4_export.py"),
 }
 
-
+# can we make top links clickable? (1. adata source etc? ) 
 def render_stepper(current_step: int):
     steps_order = [0, 1, 2, 3]
 
