@@ -1,17 +1,11 @@
-# tests/test_row_key_stability.py
-from tree_utils import compute_row_key_from_df_row
-import pandas as pd
+from data_store import load_base_df
 
 def test_row_key_is_stable_across_calls():
-    row = pd.Series(
-        {
-            "organ_system": "Electrolytes",
-            "group": "Blood",
-            "variable": "Sodium",
-        }
-    )
+    df1 = load_base_df()
+    df2 = load_base_df()
 
-    key1 = compute_row_key_from_df_row(row)
-    key2 = compute_row_key_from_df_row(row)
+    assert "__row_key__" in df1.columns
+    assert "__row_key__" in df2.columns
 
-    assert key1 == key2
+    # identical keys across calls
+    assert df1["__row_key__"].tolist() == df2["__row_key__"].tolist()
