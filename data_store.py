@@ -20,6 +20,11 @@ BASE_CSV_PATH = Path("data/clinical_variable_mapping_50_entries.csv")
 
 ####    data = response.json()  # list[dict]
 ####    return pd.DataFrame(data)
+@st.cache_data(show_spinner=False)
+def fetch_base_mapping() -> pd.DataFrame:
+    #### swap implementation later
+    return pd.read_csv(BASE_CSV_PATH)
+
 
 
 
@@ -32,7 +37,7 @@ def ensure_required_cols(df: pd.DataFrame) -> pd.DataFrame:
     for col in CORE_COLS:
         if col not in df.columns:
             df[col] = None
-    for col in ID_COLS + ["Source"]:
+    for col in ID_COLS:
         if col not in df.columns:
             df[col] = ""
     return df
@@ -52,7 +57,7 @@ def normalize_grouping(df: pd.DataFrame) -> pd.DataFrame:
 
 def normalize_ids(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    for col in ["EPIC ID", "PDMS ID", "Source"]:
+    for col in ["EPIC ID", "PDMS ID"]:
         df[col] = df[col].fillna("").astype(str).str.strip()
     return df
 
@@ -81,8 +86,9 @@ def load_base_df() -> pd.DataFrame:
     - else => stable-ish base-only key so base rows remain unique (but NOT updateable via upload)
     """
 ######    base_df = fetch_base_mapping_from_jan()
+    base_df = fetch_base_mapping()
 
-    base_df = pd.read_csv(BASE_CSV_PATH)
+    ###### base_df = pd.read_csv(BASE_CSV_PATH)
     base_df = ensure_required_cols(base_df)
     base_df = normalize_grouping(base_df)
     base_df = normalize_ids(base_df)
@@ -98,9 +104,8 @@ def load_base_df() -> pd.DataFrame:
             # this is just to keep base rows uniquely addressable
             var = row.get("Variable", "")
             os_name = row.get("Organ System", "")
-            group = row.get("Group", "")
-            src = row.get("Source", "")
-            base_keys.append(f"BASE:{var}|OS:{os_name}|GR:{group}|SRC:{src}|IDX:{i}")
+            group = row.get("Group", "") 
+            base_keys.append(f"BASE:{var}|OS:{os_name}|GR:{group}|IDX:{i}")
 
     base_df["__row_key__"] = base_keys
     base_df["__origin__"] = "base"
