@@ -206,9 +206,7 @@ Otherwise, it will be listed alphabetically under your specified group.<br><br>
 We really appreciate contributions that improve and extend the mapping 🙏<br><br>
 
 For questions or batch uploads, please contact:<br>
-<b>xxx@insel.ch</b><br>
-You can also send batch-mapped variables (EPIC / PDMS IDs) to:<br>
-<b>xxx2@insel.ch</b>
+<b>xxx@insel.ch</b><br> 
 </div>
 """,
     unsafe_allow_html=True,
