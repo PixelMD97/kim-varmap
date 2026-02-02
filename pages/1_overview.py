@@ -47,13 +47,26 @@ with left:
     )
 
 with right:
-    st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)  # align vertically
-    is_saved = bool(project_name_input.strip())
-    if is_saved:
-        st.markdown(
-            "<div style='text-align:right; color: rgba(49,51,63,0.65); font-size: 0.95rem;'>✓ </div>",
-            unsafe_allow_html=True,
-        )
+    st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+
+    def checkmark(condition: bool):
+        if condition:
+            st.markdown(
+                "<div style='text-align:right; color: rgba(49,51,63,0.65); font-size: 0.95rem;'>✓</div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown("<div style='height: 22px;'></div>", unsafe_allow_html=True)
+
+    # Project name ✓
+    checkmark(bool(project_name_input.strip()))
+
+    # Email ✓
+    checkmark(bool(owner_email_input.strip()))
+
+    # Collaborators ✓ (at least one parsed email)
+    checkmark(len(_parse_emails(collaborators_input)) > 0)
+
 
 # store centrally for later steps
 def _parse_emails(raw: str) -> list[str]:
