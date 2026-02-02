@@ -6,7 +6,7 @@ import streamlit as st
 _STEP_PAGES = {
     0: ("Overview", "pages/1_overview.py"),
     1: ("Data source", "pages/2_data_source.py"),
-    2: ("Data source system", "pages/2b_source_selection.py"),
+    2: ("Data source system", "pages/2b_system_selection.py"),
     3: ("Choose variables", "pages/3_choose_variable.py"),
     4: ("Granularity", "pages/granularity.py"),
     5: ("Export", "pages/4_export.py"),
