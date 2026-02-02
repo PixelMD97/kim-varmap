@@ -4,7 +4,9 @@ import pandas as pd
 from ui_stepper import render_stepper, render_bottom_nav
 from data_store import get_master_df
 
-
+st.markdown(
+    "THIS IS ONLY A PLACEHOLDER; REQUESTED BY CP if possible - not sure yet how to nicely implement. placeholder."
+)
 # -------------------------------------------------
 # page config
 # -------------------------------------------------
