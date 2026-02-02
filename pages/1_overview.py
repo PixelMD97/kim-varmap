@@ -28,6 +28,8 @@ with left:
         placeholder="e.g., TEST STUDY …",
     )
 
+### ADD EMAIL of user, add info that please return us idsc dataset, add disclaimers, retrospective, zu handen idsc, dlf adn datenschutzkonform, kim header. 
+
 with right:
     st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)  # align vertically
     is_saved = bool(project_name_input.strip())
