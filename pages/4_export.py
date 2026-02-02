@@ -15,7 +15,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-render_stepper(current_step=3)
+render_stepper(current_step=5)
 
 st.title("Export")
 st.markdown("Review your selected variables and download them as a CSV.")
