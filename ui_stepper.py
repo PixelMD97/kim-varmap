@@ -24,15 +24,20 @@ def render_stepper(current_step: int):
     for step_number, col in zip(_STEP_PAGES.keys(), cols):
         title, page = _STEP_PAGES[step_number]
 
-        if step_number < current_step:
-            # completed → clickable
-            col.page_link(page, label=f"{step_number}. {title}")
-        elif step_number == current_step:
-            # active
-            col.markdown(f"**{step_number}. {title}**")
+        label = f"{step_number}. {title}"
+
+        if step_number <= current_step:
+            # completed or current → bold + clickable
+            col.page_link(
+                page,
+                label=f"**{label}**",
+            )
         else:
-            # future
-            col.markdown(f"{step_number}. {title}")
+            # future → normal clickable
+            col.page_link(
+                page,
+                label=label,
+            )
 
     st.markdown(
         "<hr style='margin: 0.6rem 0 1.0rem 0; opacity: 0.25;'>",
