@@ -86,7 +86,15 @@ DISPLAY_COLUMNS = [
     "Time basis",
 ]
 
+# -------------------------------------------------
+# DEFENSIVE: ensure all display columns exist
+# -------------------------------------------------
+for col in DISPLAY_COLUMNS:
+    if col not in export_df.columns:
+        export_df[col] = ""
+
 table_df = export_df[DISPLAY_COLUMNS].copy()
+
 table_df.insert(0, "Delete", False)
 
 st.subheader("Selected variables")
