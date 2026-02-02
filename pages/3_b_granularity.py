@@ -20,23 +20,58 @@ st.set_page_config(
 render_stepper(current_step=4)
 
 st.title("Granularity")
+
+
+# -------------------------------------------------
+# EARLY EXIT: standard extraction
+# -------------------------------------------------
+if not st.session_state.get("use_custom_granularity", False):
+    st.markdown(
+        """
+### Standard extraction selected
+
+You chose to **keep standard extraction**.
+
+- All selected variables will be exported as **raw values**
+- No aggregation (mean / min / max)
+- No time grouping (per day / per shift)
+
+This is the recommended option for most use cases.
+"""
+    )
+
+    st.caption(
+        "If you want to derive daily summaries or other aggregates, "
+        "you can enable custom granularity below."
+    )
+
+    if st.button("Enable custom granularity"):
+        st.session_state["use_custom_granularity"] = True
+        st.rerun()
+
+    st.markdown("---")
+    render_bottom_nav(current_step=4)
+    st.stop()
+
+
+# -------------------------------------------------
+# Custom granularity editor (opt-in)
+# -------------------------------------------------
 st.markdown(
-    "Define how each selected variable should be extracted. "
-    "You can keep raw values, add summaries, or create multiple variants per variable."
+    """
+Define **how** each selected variable should be extracted.
+
+- Keep raw values
+- Add summaries (lowest / highest / mean)
+- Create multiple variants per variable
+"""
 )
 
-
-# -------------------------------------------------
-# helpers
-# -------------------------------------------------
-SUMMARY_OPTIONS = ["Raw", "Lowest", "Highest", "Mean"]
+SUMMARY_OPTIONS = ["Keep raw values", "Lowest", "Highest", "Mean"]
 TIME_OPTIONS = ["None", "Per day", "Per shift"]
 
 
 def _init_granularity_rows():
-    """
-    Initialize one RAW row per selected variable
-    """
     master_df = get_master_df()
     selected = st.session_state.get("checked", [])
 
@@ -52,7 +87,7 @@ def _init_granularity_rows():
             "row_id": str(uuid.uuid4()),
             "row_key": row_key,
             "Variable": r.get("Variable", ""),
-            "Summary": "Raw",
+            "Summary": "Keep raw values",
             "Time basis": "None",
         })
 
@@ -66,9 +101,6 @@ if "granularity_rows" not in st.session_state:
     st.session_state["granularity_rows"] = _init_granularity_rows()
 
 
-# -------------------------------------------------
-# build editable table
-# -------------------------------------------------
 df = pd.DataFrame(st.session_state["granularity_rows"])
 
 if df.empty:
@@ -76,6 +108,10 @@ if df.empty:
     render_bottom_nav(current_step=4)
     st.stop()
 
+
+# -------------------------------------------------
+# editor
+# -------------------------------------------------
 df_display = df.copy()
 df_display.insert(0, "Select", False)
 
@@ -84,23 +120,13 @@ edited = st.data_editor(
     use_container_width=True,
     hide_index=True,
     column_config={
-        "Select": st.column_config.CheckboxColumn(required=False),
+        "Select": st.column_config.CheckboxColumn(),
         "Variable": st.column_config.TextColumn(disabled=True),
-        "Summary": st.column_config.SelectboxColumn(
-            options=SUMMARY_OPTIONS,
-            required=True,
-        ),
-        "Time basis": st.column_config.SelectboxColumn(
-            options=TIME_OPTIONS,
-            required=True,
-        ),
+        "Summary": st.column_config.SelectboxColumn(options=SUMMARY_OPTIONS),
+        "Time basis": st.column_config.SelectboxColumn(options=TIME_OPTIONS),
     },
 )
 
-
-# -------------------------------------------------
-# write back edits
-# -------------------------------------------------
 df["Summary"] = edited["Summary"]
 df["Time basis"] = edited["Time basis"]
 df["Select"] = edited["Select"]
@@ -113,15 +139,14 @@ left, mid, right = st.columns([1, 2, 3])
 
 with left:
     if st.button("➕ Duplicate selected"):
-        new_rows = []
+        clones = []
         for _, r in df[df["Select"]].iterrows():
-            new = r.copy()
-            new["row_id"] = str(uuid.uuid4())
-            new["Select"] = False
-            new_rows.append(new)
-
-        if new_rows:
-            df = pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True)
+            c = r.copy()
+            c["row_id"] = str(uuid.uuid4())
+            c["Select"] = False
+            clones.append(c)
+        if clones:
+            df = pd.concat([df, pd.DataFrame(clones)], ignore_index=True)
 
 with mid:
     if st.button("🗑 Delete selected"):
@@ -129,23 +154,16 @@ with mid:
 
 with right:
     st.caption(
-        "Tip: Duplicate a row to apply multiple summaries "
-        "(e.g. Raw + Highest per day)."
+        "Duplicate rows to create multiple summaries "
+        "(e.g. raw + highest per day)."
     )
 
 
 # -------------------------------------------------
-# persist state
+# persist
 # -------------------------------------------------
 df = df.drop(columns=["Select"], errors="ignore")
 st.session_state["granularity_rows"] = df.to_dict(orient="records")
-
-
-# -------------------------------------------------
-# debug / preview (optional but useful)
-# -------------------------------------------------
-with st.expander("Preview extraction rows (debug)"):
-    st.dataframe(df, use_container_width=True, hide_index=True)
 
 
 st.markdown("---")
