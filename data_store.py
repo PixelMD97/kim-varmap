@@ -78,7 +78,7 @@ def stable_id_key_from_row(row: pd.Series) -> str:
     
 
 
-
+@st.cache_data(show_spinner=False)
 def load_base_df() -> pd.DataFrame:
     """
     Base rows:
