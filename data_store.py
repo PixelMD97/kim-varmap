@@ -55,6 +55,14 @@ def stable_id_key_from_row(row: pd.Series) -> str:
     if pdms_id:
         return f"PDMS:{pdms_id}"
     return ""
+###### TO DO THIS 
+def fetch_base_mapping_from_jan() -> pd.DataFrame:
+    """
+    Fetch base variable mapping from Jan's backend.
+    This replaces the CSV load in the future.
+    """
+    # TODO: replace with real API call
+    return pd.read_csv(BASE_CSV_PATH)
 
 
 def load_base_df() -> pd.DataFrame:
@@ -63,6 +71,8 @@ def load_base_df() -> pd.DataFrame:
     - if EPIC/PDMS exists => stable key (EPIC:... / PDMS:...)
     - else => stable-ish base-only key so base rows remain unique (but NOT updateable via upload)
     """
+######    base_df = fetch_base_mapping_from_jan()
+
     base_df = pd.read_csv(BASE_CSV_PATH)
     base_df = ensure_required_cols(base_df)
     base_df = normalize_grouping(base_df)
@@ -89,29 +99,52 @@ def load_base_df() -> pd.DataFrame:
 
 
 def get_master_df() -> pd.DataFrame:
-    """ ### IMPORTANT - only dataframe that UI pages are allowed to read.
+    """
+    IMPORTANT:
+    Only dataframe that UI pages are allowed to read.
+
     master = base + overlay
-    overlay wins if same __row_key__ (i.e., same EPIC/PDMS ID)
+    overlay wins if same __row_key__ (i.e. same EPIC/PDMS ID)
+    source_filter (EPIC / PDMS / Both) is applied here
     """
     base_df = load_base_df()
 
     overlay_df = st.session_state.get("overlay_df")
-    if overlay_df is None or len(overlay_df) == 0:
-        return base_df
 
-    overlay_df = overlay_df.copy()
-    overlay_df = ensure_required_cols(overlay_df)
-    overlay_df = normalize_grouping(overlay_df)
-    overlay_df = normalize_ids(overlay_df)
+    if overlay_df is not None and len(overlay_df) > 0:
+        overlay_df = overlay_df.copy()
 
-    # overlay must already have __row_key__; if not, we keep it safe
-    if "__row_key__" not in overlay_df.columns:
-        overlay_df["__row_key__"] = [f"NEW:{uuid.uuid4()}" for _ in range(len(overlay_df))]
+        # Defensive normalization
+        overlay_df = ensure_required_cols(overlay_df)
+        overlay_df = normalize_grouping(overlay_df)
+        overlay_df = normalize_ids(overlay_df)
 
-    overlay_df["__origin__"] = "user"
+        if "__row_key__" not in overlay_df.columns:
+            overlay_df["__row_key__"] = [
+                f"NEW:{uuid.uuid4()}" for _ in range(len(overlay_df))
+            ]
 
-    combined = pd.concat([base_df, overlay_df], ignore_index=True)
-    combined = combined.drop_duplicates(subset=["__row_key__"], keep="last")
+        overlay_df["__origin__"] = "user"
+
+        combined = pd.concat([base_df, overlay_df], ignore_index=True)
+        combined = combined.drop_duplicates(
+            subset=["__row_key__"], keep="last"
+        )
+    else:
+        combined = base_df.copy()
+
+    # 🔽 APPLY SOURCE FILTER (single choke point)
+    source_filter = st.session_state.get("source_filter", "Both")
+
+    if source_filter == "EPIC":
+        combined = combined[
+            combined["EPIC ID"].astype(str).str.strip() != ""
+        ]
+    elif source_filter == "PDMS":
+        combined = combined[
+            combined["PDMS ID"].astype(str).str.strip() != ""
+        ]
+
     return combined
 
 def upsert_overlay_from_upload(upload_df: pd.DataFrame) -> tuple[int, int, int, pd.DataFrame]:
