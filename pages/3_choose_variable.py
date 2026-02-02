@@ -162,3 +162,5 @@ st.session_state["expanded"] = expanded_now
 
 st.markdown("---")
 render_bottom_nav(current_step=2)
+
+## add search 
