@@ -105,16 +105,14 @@ st.session_state["checked_all_list"] = normalize_checked_values_to_row_format(
 # load + filter data
 # -------------------------------------------------
 df_master = get_master_df()
-
-# apply visibility
-df_master = df_master[df_master["is_visible"] == True]
-
+ 
 # apply EPIC / PDMS / BOTH
 source_filter = st.session_state.get("source_filter", "Both")
 if source_filter != "Both":
     df_master = df_master[
         df_master["Source"].str.upper() == source_filter.upper()
     ]
+
 
 # -------------------------------------------------
 # HARD safety: remove selections for hidden rows
