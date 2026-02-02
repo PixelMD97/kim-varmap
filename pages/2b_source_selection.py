@@ -31,6 +31,5 @@ choice = st.radio(
 # 🔐 single source of truth
 st.session_state["source_filter"] = choice
 
-render_bottom_nav(
-    next_page="pages/3_choose_variable.py",
-)
+render_bottom_nav(current_step=2)
+
