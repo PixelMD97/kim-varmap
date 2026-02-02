@@ -5,6 +5,8 @@ import pandas as pd
 import streamlit as st
 
 BASE_CSV_PATH = Path("data/clinical_variable_mapping_50_entries.csv")
+#### *** call Jan's backend 
+
 
 CORE_COLS = ["Organ System", "Group", "Variable"]
 ID_COLS = ["EPIC ID", "PDMS ID"]
@@ -87,7 +89,7 @@ def load_base_df() -> pd.DataFrame:
 
 
 def get_master_df() -> pd.DataFrame:
-    """
+    """ ### IMPORTANT - only dataframe that UI pages are allowed to read.
     master = base + overlay
     overlay wins if same __row_key__ (i.e., same EPIC/PDMS ID)
     """
