@@ -1,25 +1,36 @@
 # tests/conftest.py
+import sys
+from pathlib import Path
 import pandas as pd
 import pytest
-from pathlib import Path
 
+# -------------------------------------------------
+# Make project root importable (fixes CI imports)
+# -------------------------------------------------
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
+
+
+# -------------------------------------------------
+# Fixtures matching CURRENT data model
+# -------------------------------------------------
 @pytest.fixture
 def base_df():
     return pd.DataFrame(
         [
             {
-                "organ_system": "Electrolytes",
-                "group": "Blood",
-                "variable": "Sodium",
-                "epic_id": "EPIC_001",
-                "is_visible": True,
+                "Organ System": "Electrolytes",
+                "Group": "Blood",
+                "Variable": "Sodium",
+                "EPIC ID": "EPIC_001",
+                "PDMS ID": "",
             },
             {
-                "organ_system": "Electrolytes",
-                "group": "Blood",
-                "variable": "Potassium",
-                "epic_id": "EPIC_002",
-                "is_visible": True,
+                "Organ System": "Electrolytes",
+                "Group": "Blood",
+                "Variable": "Potassium",
+                "EPIC ID": "EPIC_002",
+                "PDMS ID": "",
             },
         ]
     )
@@ -27,14 +38,15 @@ def base_df():
 
 @pytest.fixture
 def overlay_df_1():
-    # Overrides Sodium epic_id
+    # Overrides Sodium EPIC ID
     return pd.DataFrame(
         [
             {
-                "organ_system": "Electrolytes",
-                "group": "Blood",
-                "variable": "Sodium",
-                "epic_id": "EPIC_OVERRIDE_1",
+                "Organ System": "Electrolytes",
+                "Group": "Blood",
+                "Variable": "Sodium",
+                "EPIC ID": "EPIC_OVERRIDE_1",
+                "PDMS ID": "",
             }
         ]
     )
@@ -46,10 +58,11 @@ def overlay_df_2():
     return pd.DataFrame(
         [
             {
-                "organ_system": "Electrolytes",
-                "group": "Blood",
-                "variable": "Sodium",
-                "epic_id": "EPIC_OVERRIDE_2",
+                "Organ System": "Electrolytes",
+                "Group": "Blood",
+                "Variable": "Sodium",
+                "EPIC ID": "EPIC_OVERRIDE_2",
+                "PDMS ID": "",
             }
         ]
     )
