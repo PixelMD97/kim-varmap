@@ -159,6 +159,8 @@ else:
 
 st.markdown("---")
 
+# delete a variable (trash can in table maybe?) or somehow else 
+
 
 # -----------------------------
 # Add a variable
