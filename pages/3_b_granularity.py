@@ -86,10 +86,10 @@ def _init_granularity_rows():
         rows.append({
             "row_id": str(uuid.uuid4()),
             "row_key": row_key,
-            "Variable": r.get("Variable", ""),
-            "Summary": "Keep raw values",
+            "Summary": "Raw",
             "Time basis": "None",
         })
+
 
     return rows
 
