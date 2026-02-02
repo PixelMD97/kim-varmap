@@ -4,8 +4,23 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+import requests
+
 BASE_CSV_PATH = Path("data/clinical_variable_mapping_50_entries.csv")
-#### *** call Jan's backend 
+#### *** call Jan's backend
+
+
+#### JAN_API_URL = "https://jan-backend.xxx/api/variable-mapping"
+#### JAN_API_TIMEOUT = 10
+
+
+#### def fetch_base_mapping_from_jan() -> pd.DataFrame:
+####    response = requests.get(JAN_API_URL, timeout=JAN_API_TIMEOUT)
+####    response.raise_for_status()
+
+####    data = response.json()  # list[dict]
+####    return pd.DataFrame(data)
+
 
 
 CORE_COLS = ["Organ System", "Group", "Variable"]
@@ -55,14 +70,8 @@ def stable_id_key_from_row(row: pd.Series) -> str:
     if pdms_id:
         return f"PDMS:{pdms_id}"
     return ""
-###### TO DO THIS 
-def fetch_base_mapping_from_jan() -> pd.DataFrame:
-    """
-    Fetch base variable mapping from Jan's backend.
-    This replaces the CSV load in the future.
-    """
-    # TODO: replace with real API call
-    return pd.read_csv(BASE_CSV_PATH)
+    
+
 
 
 def load_base_df() -> pd.DataFrame:
