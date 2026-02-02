@@ -5,9 +5,11 @@ from datetime import datetime
 
 from ui_stepper import render_stepper, render_bottom_nav
 from data_store import get_master_df, upsert_overlay_from_upload
-from tree_utils import build_nodes_and_lookup
 
 
+# -------------------------------------------------
+# Page config
+# -------------------------------------------------
 st.set_page_config(
     page_title="KIM VarMap – Export",
     page_icon="🧠",
@@ -20,6 +22,7 @@ render_stepper(current_step=5)
 st.title("Export")
 st.markdown("Review your selected variables and download them as a CSV.")
 
+
 project_name = (
     st.session_state.get("project_meta", {})
     .get("project_name", "")
@@ -30,222 +33,148 @@ if project_name:
     st.markdown(f"Project: **{project_name}**")
 
 
-# -----------------------------
-# helpers
-# -----------------------------
+# -------------------------------------------------
+# Load state
+# -------------------------------------------------
+granularity_rows = st.session_state.get("granularity_rows", [])
 
-def attach_granularity(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Attach granularity metadata from session_state to export df.
-    """
-    gran_cfg = st.session_state.get("granularity_config", {})
+if not granularity_rows:
+    st.info("No variables selected yet. Go back to **Choose variables**.")
+    render_bottom_nav(current_step=5)
+    st.stop()
 
-    def _get(row_key, field, default=""):
-        return gran_cfg.get(row_key, {}).get(field, default)
-
-    df = df.copy()
-    df["Aggregation"] = df["__row_key__"].apply(lambda k: _get(k, "aggregation"))
-    df["Time anchor"] = df["__row_key__"].apply(lambda k: _get(k, "time_anchor"))
-    df["Time window"] = df["__row_key__"].apply(lambda k: _get(k, "time_window"))
-    df["Allow duplicates"] = df["__row_key__"].apply(
-        lambda k: _get(k, "allow_duplicates", False)
-    )
-
-    return df
+gran_df = pd.DataFrame(granularity_rows)
+master_df = get_master_df()
 
 
-
-def refresh_master_lookup():
-    """
-    Rebuild a lookup from the current master df.
-
-    IMPORTANT:
-    - With the updated tree_utils.py, build_nodes_and_lookup requires __row_key__.
-    - Do NOT drop __ columns here anymore.
-    """
-    df_master = get_master_df()
-    _, leaf_lookup_master = build_nodes_and_lookup(df_master)
-    st.session_state["leaf_lookup_master"] = leaf_lookup_master
-    return leaf_lookup_master
+# -------------------------------------------------
+# Merge granularity + master data
+# -------------------------------------------------
+export_df = gran_df.merge(
+    master_df,
+    how="left",
+    left_on="row_key",
+    right_on="__row_key__",
+)
 
 
-def normalize_checked_values_to_row_format(checked_values: list) -> list[str]:
-    """
-    Convert any legacy leaf values to the new stable format.
-
-    New format:  "ROW:<__row_key__>"
-    Old format:  "<os>/<group>/<var>|<row_key>"
-    """
-    normalized = []
-
-    for v in checked_values or []:
-        if not isinstance(v, str):
-            continue
-
-        v = v.strip()
-        if not v:
-            continue
-
-        if v.startswith("ROW:"):
-            normalized.append(v)
-            continue
-
-        if "|" in v:
-            maybe_row_key = v.split("|")[-1].strip()
-            if maybe_row_key:
-                normalized.append(f"ROW:{maybe_row_key}")
-            continue
-
-    # de-dup while preserving order
-    seen = set()
-    out = []
-    for x in normalized:
-        if x not in seen:
-            out.append(x)
-            seen.add(x)
-    return out
+# -------------------------------------------------
+# Origin column
+# -------------------------------------------------
+export_df["Origin"] = "Base"
+export_df.loc[export_df["user_created"] == True, "Origin"] = "User created"
+export_df.loc[export_df["user_uploaded_at"].notna(), "Origin"] = "User upload"
 
 
-def build_export_view(df_selected: pd.DataFrame) -> pd.DataFrame:
-    df_out = df_selected.copy()
+# -------------------------------------------------
+# Final display table
+# -------------------------------------------------
+DISPLAY_COLUMNS = [
+    "Variable",
+    "Organ System",
+    "Group",
+    "Source",
+    "EPIC ID",
+    "PDMS ID",
+    "Unit",
+    "Origin",
+    "Summary",
+    "Time basis",
+]
 
-    # Hide internal columns
-    df_out = df_out.drop(columns=[c for c in df_out.columns if str(c).startswith("__")], errors="ignore")
+table_df = export_df[DISPLAY_COLUMNS].copy()
+table_df.insert(0, "Delete", False)
 
-    # Ensure provenance columns exist
-    if "user_created" not in df_out.columns:
-        df_out["user_created"] = False
-    if "user_uploaded_at" not in df_out.columns:
-        df_out["user_uploaded_at"] = pd.NA
-
-    # Friendly origin column
-    df_out["Origin"] = "Base"
-    df_out.loc[df_out["user_uploaded_at"].notna(), "Origin"] = "User upload"
-    df_out.loc[df_out["user_created"] == True, "Origin"] = "User created"
-
-    # Visible columns
-    preferred = ["Variable", "Organ System", "Group", "Source", "EPIC ID", "PDMS ID", "Unit", "Origin"]
-    cols = [c for c in preferred if c in df_out.columns]
-
-    # Append other non-provenance columns (optional)
-    hide_these = {"user_created", "user_uploaded_at"}
-    extras = [c for c in df_out.columns if c not in cols and c not in hide_these]
-
-    return df_out[cols + extras]
-
-
-# -----------------------------
-# ensure state keys exist
-# -----------------------------
-if "checked" not in st.session_state:
-    st.session_state["checked"] = []
-if "checked_all_list" not in st.session_state:
-    st.session_state["checked_all_list"] = []
-
-# normalize (handles users who still have legacy leaf values in state)
-st.session_state["checked"] = normalize_checked_values_to_row_format(st.session_state["checked"])
-st.session_state["checked_all_list"] = normalize_checked_values_to_row_format(st.session_state["checked_all_list"])
-
-
-# -----------------------------
-# Ensure lookup exists even if user jumps directly to Export
-# -----------------------------
-leaf_lookup_master = st.session_state.get("leaf_lookup_master")
-if not leaf_lookup_master:
-    leaf_lookup_master = refresh_master_lookup()
-
-
-# -----------------------------
-# Selected variables
-# -----------------------------
-checked = st.session_state.get("checked", [])
-selected_rows = [leaf_lookup_master[v] for v in checked if v in leaf_lookup_master]
 
 st.subheader("Selected variables")
 
-if not selected_rows:
-    st.info("No variables selected yet. Go to **Choose variables** and select some items.")
-else:
-    selected_df_raw = pd.DataFrame(selected_rows)
-
-    # attach granularity BEFORE hiding __ columns
-    selected_df_with_gran = attach_granularity(selected_df_raw)
-    
-    export_view = build_export_view(selected_df_with_gran)
-
-
-    st.dataframe(export_view, use_container_width=True, hide_index=True)
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    safe_project = (project_name or "kim_varmap").replace(" ", "_").replace("/", "_").lower()
-    file_name = f"variablemapping_{safe_project}_{timestamp}.csv"
-
-    csv_bytes = export_view.to_csv(index=False).encode("utf-8")
-
-    st.download_button(
-        label="Download CSV",
-        data=csv_bytes,
-        file_name=file_name,
-        mime="text/csv",
-    )
-
-st.markdown("---")
-
-st.subheader("Remove selected variables")
-
-remove_choices = st.multiselect(
-    "Remove variables from selection",
-    options=checked,
-    format_func=lambda v: leaf_lookup_master[v]["Variable"]
-    if v in leaf_lookup_master else v,
+edited = st.data_editor(
+    table_df,
+    use_container_width=True,
+    hide_index=True,
+    column_config={
+        "Delete": st.column_config.CheckboxColumn(""),
+        "Variable": st.column_config.TextColumn(disabled=True),
+        "Organ System": st.column_config.TextColumn(disabled=True),
+        "Group": st.column_config.TextColumn(disabled=True),
+        "Source": st.column_config.TextColumn(disabled=True),
+        "EPIC ID": st.column_config.TextColumn(disabled=True),
+        "PDMS ID": st.column_config.TextColumn(disabled=True),
+        "Unit": st.column_config.TextColumn(disabled=True),
+        "Origin": st.column_config.TextColumn(disabled=True),
+        "Summary": st.column_config.TextColumn(disabled=True),
+        "Time basis": st.column_config.TextColumn(disabled=True),
+    },
 )
 
-if remove_choices:
-    st.session_state["checked"] = [
-        v for v in st.session_state["checked"] if v not in remove_choices
-    ]
-    st.session_state["checked_all_list"] = st.session_state["checked"]
-    st.success(f"Removed {len(remove_choices)} variable(s) from selection.")
+
+# -------------------------------------------------
+# Delete selected rows
+# -------------------------------------------------
+if st.button("🗑 Delete selected"):
+    keep_mask = ~edited["Delete"]
+    kept = gran_df.loc[keep_mask.values].copy()
+
+    st.session_state["granularity_rows"] = kept.to_dict(orient="records")
+    st.success("Selected rows removed.")
     st.rerun()
 
 
-# -----------------------------
-# Add a variable
-# -----------------------------
-st.subheader("Add a variable")
-st.markdown("Add a custom variable here. It will be appended to your selected variables above.")
+# -------------------------------------------------
+# CSV export (what you see = what you get)
+# -------------------------------------------------
+csv_df = export_df[DISPLAY_COLUMNS].copy()
 
-COMMON_UNITS = ["", "mmHg", "bpm", "%", "°C", "kg", "g/L", "mg/L", "mmol/L", "mL", "L/min", "score", "Other"]
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+safe_project = (project_name or "kim_varmap").replace(" ", "_").lower()
+
+csv_bytes = csv_df.to_csv(index=False).encode("utf-8")
+
+st.download_button(
+    label="Download CSV",
+    data=csv_bytes,
+    file_name=f"variablemapping_{safe_project}_{timestamp}.csv",
+    mime="text/csv",
+)
+
+
+# -------------------------------------------------
+# Add variable (unchanged logic)
+# -------------------------------------------------
+st.markdown("---")
+st.subheader("Add a variable")
+
+COMMON_UNITS = [
+    "", "mmHg", "bpm", "%", "°C", "kg", "g/L",
+    "mg/L", "mmol/L", "mL", "L/min", "score", "Other"
+]
 
 with st.form("add_variable_form", clear_on_submit=True):
     variable = st.text_input("Variable *", placeholder="e.g. Creatinine")
     organ_system = st.text_input("Organ System", placeholder="e.g. Renal")
     group = st.text_input("Group", placeholder="e.g. Labs")
-    source = st.selectbox("Source", options=["Both", "EPIC", "PDMS"], index=0)
-    epic_id = st.text_input("EPIC ID", placeholder="e.g. E-CREA-001")
-    pdms_id = st.text_input("PDMS ID", placeholder="e.g. P-CREA-001")
+    source = st.selectbox("Source", options=["Both", "EPIC", "PDMS"])
+    epic_id = st.text_input("EPIC ID")
+    pdms_id = st.text_input("PDMS ID")
 
-    unit_choice = st.selectbox("Unit", options=COMMON_UNITS, index=0)
+    unit_choice = st.selectbox("Unit", options=COMMON_UNITS)
     unit_other = ""
     if unit_choice == "Other":
-        unit_other = st.text_input("Other unit", placeholder="e.g. U/L")
+        unit_other = st.text_input("Other unit")
 
     submitted = st.form_submit_button("Add variable")
 
 
 if submitted:
-    variable_clean = variable.strip()
-    if not variable_clean:
+    if not variable.strip():
         st.error("Variable is required.")
     else:
-        organ_system_clean = organ_system.strip() or "General"
-        group_clean = group.strip() or "General"
-        unit_clean = (unit_other.strip() if unit_choice == "Other" else unit_choice.strip())
+        unit_clean = unit_other.strip() if unit_choice == "Other" else unit_choice
 
         new_row = {
-            "Variable": variable_clean,
-            "Organ System": organ_system_clean,
-            "Group": group_clean,
+            "Variable": variable.strip(),
+            "Organ System": organ_system.strip() or "General",
+            "Group": group.strip() or "General",
             "Source": source,
             "EPIC ID": epic_id.strip(),
             "PDMS ID": pdms_id.strip(),
@@ -255,26 +184,19 @@ if submitted:
         upload_df = pd.DataFrame([new_row])
         added, updated, skipped, processed_df = upsert_overlay_from_upload(upload_df)
 
-        if processed_df is None or processed_df.empty or "__row_key__" not in processed_df.columns:
-            st.warning("Variable added, but could not determine row key for auto-selection.")
-        else:
-            new_keys = processed_df["__row_key__"].astype(str).tolist()
-            new_leaf_values = [f"ROW:{k}" for k in new_keys]
+        if processed_df is not None and "__row_key__" in processed_df.columns:
+            for rk in processed_df["__row_key__"]:
+                st.session_state["granularity_rows"].append({
+                    "row_id": str(rk),
+                    "row_key": rk,
+                    "Variable": variable.strip(),
+                    "Summary": "Raw",
+                    "Time basis": "None",
+                })
 
-            checked_set = set(st.session_state.get("checked", []))
-            checked_all_set = set(st.session_state.get("checked_all_list", []))
+        st.success("Variable added.")
+        st.rerun()
 
-            checked_set.update(new_leaf_values)
-            checked_all_set.update(new_leaf_values)
-
-            st.session_state["checked"] = sorted(checked_set)
-            st.session_state["checked_all_list"] = sorted(checked_all_set)
-
-            # refresh lookup so it appears immediately
-            refresh_master_lookup()
-
-            st.success("Variable added and selected.")
-            st.rerun()
 
 st.markdown("---")
 render_bottom_nav(current_step=5)
