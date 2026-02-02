@@ -113,7 +113,7 @@ df_master = df_master[df_master["is_visible"] == True]
 source_filter = st.session_state.get("source_filter", "Both")
 if source_filter != "Both":
     df_master = df_master[
-        df_master["source"].str.upper() == source_filter.upper()
+        df_master["Source"].str.upper() == source_filter.upper()
     ]
 
 # -------------------------------------------------
