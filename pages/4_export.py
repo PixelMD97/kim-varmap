@@ -159,7 +159,7 @@ else:
 
 st.markdown("---")
 
-# delete a variable (trash can in table maybe?) or somehow else 
+# delete a variable  froM; UI / selection. not delete in df. (trash can in table maybe?) or somehow else 
 
 
 # -----------------------------
