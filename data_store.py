@@ -131,19 +131,10 @@ def get_master_df() -> pd.DataFrame:
             subset=["__row_key__"], keep="last"
         )
     else:
-        combined = base_df.copy()
-
-    # 🔽 APPLY SOURCE FILTER (single choke point)
-    source_filter = st.session_state.get("source_filter", "Both")
-
-    if source_filter == "EPIC":
-        combined = combined[
-            combined["EPIC ID"].astype(str).str.strip() != ""
-        ]
-    elif source_filter == "PDMS":
-        combined = combined[
-            combined["PDMS ID"].astype(str).str.strip() != ""
-        ]
+        combined = base_df.copy() 
+        
+    if "is_visible" not in combined.columns:
+        combined["is_visible"] = True
 
     return combined
 
