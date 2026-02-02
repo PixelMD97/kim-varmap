@@ -20,6 +20,16 @@ st.markdown("### Project information")
 
 left, right = st.columns([6, 1])
 
+# store centrally for later steps
+def _parse_emails(raw: str) -> list[str]:
+    return [
+        e.strip()
+        for e in raw.split(",")
+        if e.strip()
+    ]
+
+
+left, right = st.columns([6, 1])
 with left:
     project_name_input = st.text_input(
         "Project name",
