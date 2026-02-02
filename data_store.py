@@ -107,36 +107,42 @@ def get_master_df() -> pd.DataFrame:
     overlay wins if same __row_key__ (i.e. same EPIC/PDMS ID)
     source_filter (EPIC / PDMS / Both) is applied here
     """
+    def get_master_df() -> pd.DataFrame:
     base_df = load_base_df()
-
     overlay_df = st.session_state.get("overlay_df")
 
     if overlay_df is not None and len(overlay_df) > 0:
         overlay_df = overlay_df.copy()
-
-        # Defensive normalization
         overlay_df = ensure_required_cols(overlay_df)
         overlay_df = normalize_grouping(overlay_df)
         overlay_df = normalize_ids(overlay_df)
 
         if "__row_key__" not in overlay_df.columns:
-            overlay_df["__row_key__"] = [
-                f"NEW:{uuid.uuid4()}" for _ in range(len(overlay_df))
-            ]
+            overlay_df["__row_key__"] = [f"NEW:{uuid.uuid4()}" for _ in range(len(overlay_df))]
 
         overlay_df["__origin__"] = "user"
-
         combined = pd.concat([base_df, overlay_df], ignore_index=True)
-        combined = combined.drop_duplicates(
-            subset=["__row_key__"], keep="last"
-        )
+        combined = combined.drop_duplicates(subset=["__row_key__"], keep="last")
     else:
-        combined = base_df.copy() 
-        
-    if "is_visible" not in combined.columns:
-        combined["is_visible"] = True
+        combined = base_df.copy()
+
+    # -------------------------
+    # 🔑 SINGLE SOURCE FILTER
+    # -------------------------
+    source_filter = st.session_state.get("source_filter", "Both")
+
+    if source_filter == "EPIC":
+        combined = combined[
+            combined["EPIC ID"].astype(str).str.strip() != ""
+        ]
+    elif source_filter == "PDMS":
+        combined = combined[
+            combined["PDMS ID"].astype(str).str.strip() != ""
+        ]
+    # Both → no filtering
 
     return combined
+
 
 def upsert_overlay_from_upload(upload_df: pd.DataFrame) -> tuple[int, int, int, pd.DataFrame]:
     """
