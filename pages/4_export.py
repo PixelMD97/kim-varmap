@@ -59,12 +59,15 @@ export_df = gran_df.merge(
 
 
 # -------------------------------------------------
-# Origin column
+# Origin column (DEFENSIVE)
 # -------------------------------------------------
 export_df["Origin"] = "Base"
-export_df.loc[export_df["user_created"] == True, "Origin"] = "User created"
-export_df.loc[export_df["user_uploaded_at"].notna(), "Origin"] = "User upload"
 
+if "user_created" in export_df.columns:
+    export_df.loc[export_df["user_created"] == True, "Origin"] = "User created"
+
+if "user_uploaded_at" in export_df.columns:
+    export_df.loc[export_df["user_uploaded_at"].notna(), "Origin"] = "User upload"
 
 # -------------------------------------------------
 # Final display table
