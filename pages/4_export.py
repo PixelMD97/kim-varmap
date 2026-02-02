@@ -230,4 +230,4 @@ if submitted:
             st.rerun()
 
 st.markdown("---")
-render_bottom_nav(current_step=3)
+render_bottom_nav(current_step=5)
