@@ -23,12 +23,28 @@ left, right = st.columns([6, 1])
 with left:
     project_name_input = st.text_input(
         "Project name",
-        value=st.session_state.get("project_name", ""),
+        value=st.session_state.get("project_meta", {}).get("project_name", ""),
         key="project_name_input",
         placeholder="e.g., TEST STUDY …",
     )
 
-### ADD EMAIL of user, add info that please return us idsc dataset, add disclaimers, retrospective, zu handen idsc, dlf adn datenschutzkonform, kim header. 
+    owner_email_input = st.text_input(
+        "Your email",
+        value=st.session_state.get("project_meta", {}).get("owner_email", ""),
+        key="owner_email_input",
+        placeholder="firstname.lastname@insel.ch",
+        help="Primary contact person for this project",
+    )
+
+    collaborators_input = st.text_area(
+        "Additional collaborators (optional)",
+        value=", ".join(
+            st.session_state.get("project_meta", {}).get("collaborators", [])
+        ),
+        key="collaborators_input",
+        placeholder="email1@insel.ch, email2@insel.ch",
+        help="Comma-separated list of collaborators invited to work on this project",
+    )
 
 with right:
     st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)  # align vertically
@@ -40,8 +56,21 @@ with right:
         )
 
 # store centrally for later steps
+def _parse_emails(raw: str) -> list[str]:
+    return [
+        e.strip()
+        for e in raw.split(",")
+        if e.strip()
+    ]
+
+
 if project_name_input.strip():
-    st.session_state["project_name"] = project_name_input.strip()
+    st.session_state["project_meta"] = {
+        "project_name": project_name_input.strip(),
+        "owner_email": owner_email_input.strip(),
+        "collaborators": _parse_emails(collaborators_input),
+    }
+
 
 st.markdown("### How it works")
 st.markdown(
@@ -59,5 +88,27 @@ st.markdown(
 )
 
 st.markdown("---")
+
+st.markdown(
+    """
+### Data usage & responsibilities
+
+- blah blah 
+retrospective data analysis.z u handen IDS-C. **datenschutzkonforme** manner
+  and comply with applicable institutional and legal requirements. 
+
+  
+- If you receive an IDS-C dataset based on this mapping,  we will ask you to 
+also ask to keep increasing mappings 
+  **please return the final dataset or derived variable list **.
+ 
+- all data processing complies with institutional DLF and data protection policies.
+"""
+)
+
+
+st.markdown("---")
  
 st.page_link("pages/2_data_source.py", label="Start →", use_container_width=True)
+
+
