@@ -7,62 +7,64 @@ from data_store import get_master_df
 from ui_stepper import render_stepper, render_bottom_nav
 
 
+# -------------------------------------------------
+# page config
+# -------------------------------------------------
 st.set_page_config(
     page_title="KIM VarMap – Choose variables",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
-render_stepper(current_step=2)
+render_stepper(current_step=3)
 
 st.title("Choose variables")
 st.markdown("Expand the categories and select the variables you need.")
 st.markdown(
-    "<div style='opacity:0.6; font-size:0.85rem;'>Tip: Use <b>Ctrl+F</b> in your browser to quickly find text on the page.</div>",
+    "<div style='opacity:0.6; font-size:0.85rem;'>"
+    "Tip: Use <b>Ctrl+F</b> in your browser to quickly find text on the page."
+    "</div>",
     unsafe_allow_html=True,
 )
 
-project_name = st.session_state.get("project_name", "").strip()
+project_name = (
+    st.session_state.get("project_meta", {})
+    .get("project_name", "")
+    .strip()
+)
 if project_name:
     st.markdown(f"Project: **{project_name}**")
 
 
-# -----------------------------
+# -------------------------------------------------
 # helpers
-# -----------------------------
+# -------------------------------------------------
 def reset_tree_widget_state():
-    # tree_select stores its internal state under the widget key
     if "var_tree" in st.session_state:
         del st.session_state["var_tree"]
 
 
 def compute_all_expand_values(tree_nodes):
-    expanded_values = set()
+    expanded = set()
 
-    def walk(node_list):
-        for node in node_list:
-            if isinstance(node, dict) and node.get("children"):
-                expanded_values.add(node.get("value"))
-                walk(node.get("children", []))
+    def walk(nodes):
+        for n in nodes:
+            if isinstance(n, dict) and n.get("children"):
+                expanded.add(n.get("value"))
+                walk(n["children"])
 
     walk(tree_nodes)
-    return sorted([v for v in expanded_values if v is not None])
+    return sorted(v for v in expanded if v is not None)
 
 
-def normalize_checked_values_to_row_format(checked_values: list) -> list[str]:
+def normalize_checked_values_to_row_format(values: list[str]) -> list[str]:
     """
-    Convert any legacy leaf values to the new stable format.
-
-    New format:  "ROW:<__row_key__>"
-    Old format:  "<os>/<group>/<var>|<row_key>"
-
-    We keep only:
-    - values starting with ROW:
-    - OR convert legacy values that contain a trailing "|<row_key>"
+    Enforce canonical format: ROW:<row_key>
     """
-    normalized = []
+    out = []
+    seen = set()
 
-    for v in checked_values or []:
+    for v in values or []:
         if not isinstance(v, str):
             continue
 
@@ -70,60 +72,79 @@ def normalize_checked_values_to_row_format(checked_values: list) -> list[str]:
         if not v:
             continue
 
-        # already new format
         if v.startswith("ROW:"):
-            normalized.append(v)
+            rk = v.replace("ROW:", "")
+        elif "|" in v:
+            rk = v.split("|")[-1].strip()
+        else:
             continue
 
-        # legacy format: "...|<row_key>"
-        if "|" in v:
-            maybe_row_key = v.split("|")[-1].strip()
-            if maybe_row_key:
-                normalized.append(f"ROW:{maybe_row_key}")
-            continue
+        if rk and rk not in seen:
+            out.append(f"ROW:{rk}")
+            seen.add(rk)
 
-        # everything else is ignored (OS:..., GR:..., etc.)
-    # de-dup while preserving order
-    seen = set()
-    out = []
-    for x in normalized:
-        if x not in seen:
-            out.append(x)
-            seen.add(x)
     return out
 
 
-# -----------------------------
-# state init (keep old keys)
-# -----------------------------
-if "checked_all_list" not in st.session_state:
-    st.session_state["checked_all_list"] = []
-if "checked" not in st.session_state:
-    st.session_state["checked"] = []
-if "expanded" not in st.session_state:
-    st.session_state["expanded"] = []
+# -------------------------------------------------
+# state init
+# -------------------------------------------------
+st.session_state.setdefault("checked", [])
+st.session_state.setdefault("checked_all_list", [])
+st.session_state.setdefault("expanded", [])
 
-# normalize once on load so older sessions don't break
-st.session_state["checked_all_list"] = normalize_checked_values_to_row_format(st.session_state["checked_all_list"])
-st.session_state["checked"] = normalize_checked_values_to_row_format(st.session_state["checked"])
+st.session_state["checked"] = normalize_checked_values_to_row_format(
+    st.session_state["checked"]
+)
+st.session_state["checked_all_list"] = normalize_checked_values_to_row_format(
+    st.session_state["checked_all_list"]
+)
 
 
-# -----------------------------
-# load + build tree
-# IMPORTANT: do NOT drop __row_key__ anymore
-# -----------------------------
+# -------------------------------------------------
+# load + filter data
+# -------------------------------------------------
 df_master = get_master_df()
-nodes, leaf_lookup_master = build_nodes_and_lookup(df_master)
 
-# store lookup for other pages if they still rely on it
+# apply EPIC / PDMS / BOTH
+source_filter = st.session_state.get("source_filter", "Both")
+if source_filter != "Both":
+    df_master = df_master[
+        df_master["source"].str.upper() == source_filter.upper()
+    ]
+
+# apply visibility
+df_master = df_master[df_master["is_visible"] == True]
+
+# -------------------------------------------------
+# HARD safety: remove selections for hidden rows
+# -------------------------------------------------
+valid_row_keys = set(df_master["__row_key__"].astype(str))
+
+def _filter_checked(values):
+    return [
+        v for v in values
+        if v.startswith("ROW:")
+        and v.replace("ROW:", "") in valid_row_keys
+    ]
+
+st.session_state["checked"] = _filter_checked(st.session_state["checked"])
+st.session_state["checked_all_list"] = _filter_checked(
+    st.session_state["checked_all_list"]
+)
+
+# -------------------------------------------------
+# build tree (AFTER filtering!)
+# -------------------------------------------------
+nodes, leaf_lookup_master = build_nodes_and_lookup(df_master)
 st.session_state["leaf_lookup_master"] = leaf_lookup_master
 
 all_expand_values = compute_all_expand_values(nodes)
 
 
-# -----------------------------
-# controls row
-# -----------------------------
+# -------------------------------------------------
+# controls
+# -------------------------------------------------
 ctrl_cols = st.columns([1, 1, 6])
 
 with ctrl_cols[0]:
@@ -139,9 +160,9 @@ with ctrl_cols[1]:
         st.rerun()
 
 
-# -----------------------------
-# tree
-# -----------------------------
+# -------------------------------------------------
+# tree widget
+# -------------------------------------------------
 selected = tree_select(
     nodes,
     checked=st.session_state["checked_all_list"],
@@ -149,18 +170,14 @@ selected = tree_select(
     key="var_tree",
 )
 
-checked_now = selected.get("checked", [])
-expanded_now = selected.get("expanded", [])
+checked_now = normalize_checked_values_to_row_format(
+    selected.get("checked", [])
+)
 
-# normalize checked output too (defensive)
-checked_now_normalized = normalize_checked_values_to_row_format(checked_now)
-
-st.session_state["checked_all_list"] = checked_now_normalized
-st.session_state["checked"] = checked_now_normalized  # used by export
-st.session_state["expanded"] = expanded_now
+st.session_state["checked"] = checked_now
+st.session_state["checked_all_list"] = checked_now
+st.session_state["expanded"] = selected.get("expanded", [])
 
 
 st.markdown("---")
-render_bottom_nav(current_step=2)
-
-## add search 
+render_bottom_nav(current_step=3)
