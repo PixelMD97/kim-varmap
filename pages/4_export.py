@@ -1,4 +1,4 @@
-
+# pages/4_export.py
 import pandas as pd
 import streamlit as st
 from datetime import datetime
@@ -21,7 +21,6 @@ render_stepper(current_step=5)
 
 st.title("Export")
 st.markdown("Review your selected variables and download them as a CSV.")
-
 
 project_name = (
     st.session_state.get("project_meta", {})
@@ -59,7 +58,7 @@ export_df = gran_df.merge(
 
 
 # -------------------------------------------------
-# Origin column (DEFENSIVE)
+# Origin + inferred Source (DEFENSIVE)
 # -------------------------------------------------
 export_df["Origin"] = "Base"
 
@@ -70,8 +69,24 @@ if "user_uploaded_at" in export_df.columns:
     export_df.loc[export_df["user_uploaded_at"].notna(), "Origin"] = "User upload"
 
 
+def infer_source(row):
+    epic = str(row.get("EPIC ID", "")).strip()
+    pdms = str(row.get("PDMS ID", "")).strip()
+
+    if epic and pdms:
+        return "Both"
+    if epic:
+        return "EPIC"
+    if pdms:
+        return "PDMS"
+    return ""
+
+
+export_df["Source"] = export_df.apply(infer_source, axis=1)
+
+
 # -------------------------------------------------
-# Final display table
+# Final display table (DEFENSIVE)
 # -------------------------------------------------
 DISPLAY_COLUMNS = [
     "Variable",
@@ -86,15 +101,12 @@ DISPLAY_COLUMNS = [
     "Time basis",
 ]
 
-# -------------------------------------------------
-# DEFENSIVE: ensure all display columns exist
-# -------------------------------------------------
+# ensure all columns exist
 for col in DISPLAY_COLUMNS:
     if col not in export_df.columns:
         export_df[col] = ""
 
 table_df = export_df[DISPLAY_COLUMNS].copy()
-
 table_df.insert(0, "Delete", False)
 
 st.subheader("Selected variables")
@@ -150,7 +162,7 @@ st.download_button(
 
 
 # -------------------------------------------------
-# Add variable (unchanged logic)
+# Add variable
 # -------------------------------------------------
 st.markdown("---")
 st.subheader("Add a variable")
@@ -162,9 +174,9 @@ COMMON_UNITS = [
 
 with st.form("add_variable_form", clear_on_submit=True):
     variable = st.text_input("Variable *", placeholder="e.g. Creatinine")
-    organ_system = st.text_input("Organ System", placeholder="e.g. Renal")
+    organ_system = st.text_input("Organ system", placeholder="e.g. Renal")
     group = st.text_input("Group", placeholder="e.g. Labs")
-    source = st.selectbox("Source", options=["Both", "EPIC", "PDMS"])
+
     epic_id = st.text_input("EPIC ID")
     pdms_id = st.text_input("PDMS ID")
 
@@ -176,37 +188,74 @@ with st.form("add_variable_form", clear_on_submit=True):
     submitted = st.form_submit_button("Add variable")
 
 
+# -------------------------------------------------
+# Helper text (small grey)
+# -------------------------------------------------
+st.markdown(
+    """
+<div style="color: rgba(49,51,63,0.65); font-size: 0.9rem; margin-top: -0.5rem;">
+You can add new variables to help this project grow organically.<br><br>
+
+• Please provide a <b>clear variable name</b><br>
+• Define <b>at least one identifier</b> (EPIC ID or PDMS ID)<br>
+• Make an <b>educated guess</b> for organ system and group<br><br>
+
+If your entry matches our standard mapping, it will automatically appear in the correct category.
+Otherwise, it will be listed alphabetically under your specified group.<br><br>
+
+We really appreciate contributions that improve and extend the mapping 🙏<br><br>
+
+For questions or batch uploads, please contact:<br>
+<b>xxx@insel.ch</b><br>
+You can also send batch-mapped variables (EPIC / PDMS IDs) to:<br>
+<b>xxx2@insel.ch</b>
+</div>
+""",
+    unsafe_allow_html=True,
+)
+
+
+# -------------------------------------------------
+# Handle submit
+# -------------------------------------------------
 if submitted:
     if not variable.strip():
-        st.error("Variable is required.")
-    else:
-        unit_clean = unit_other.strip() if unit_choice == "Other" else unit_choice
+        st.error("Variable name is required.")
+        st.stop()
 
-        new_row = {
-            "Variable": variable.strip(),
-            "Organ System": organ_system.strip() or "General",
-            "Group": group.strip() or "General",
-            "Source": source,
-            "EPIC ID": epic_id.strip(),
-            "PDMS ID": pdms_id.strip(),
-            "Unit": unit_clean,
-        }
+    epic_clean = epic_id.strip()
+    pdms_clean = pdms_id.strip()
 
-        upload_df = pd.DataFrame([new_row])
-        added, updated, skipped, processed_df = upsert_overlay_from_upload(upload_df)
+    if not epic_clean and not pdms_clean:
+        st.error("Please provide at least one identifier (EPIC ID or PDMS ID).")
+        st.stop()
 
-        if processed_df is not None and "__row_key__" in processed_df.columns:
-            for rk in processed_df["__row_key__"]:
-                st.session_state["granularity_rows"].append({
-                    "row_id": rk,
-                    "row_key": rk,
-                    "Variable": variable.strip(),
-                    "Summary": "Raw",
-                    "Time basis": "None",
-                })
+    unit_clean = unit_other.strip() if unit_choice == "Other" else unit_choice
 
-        st.success("Variable added.")
-        st.rerun()
+    new_row = {
+        "Variable": variable.strip(),
+        "Organ System": organ_system.strip() or "General",
+        "Group": group.strip() or "General",
+        "EPIC ID": epic_clean,
+        "PDMS ID": pdms_clean,
+        "Unit": unit_clean,
+    }
+
+    upload_df = pd.DataFrame([new_row])
+    added, updated, skipped, processed_df = upsert_overlay_from_upload(upload_df)
+
+    if processed_df is not None and "__row_key__" in processed_df.columns:
+        for rk in processed_df["__row_key__"]:
+            st.session_state["granularity_rows"].append({
+                "row_id": rk,
+                "row_key": rk,
+                "Variable": variable.strip(),
+                "Summary": "Raw",
+                "Time basis": "None",
+            })
+
+    st.success("Variable added.")
+    st.rerun()
 
 
 st.markdown("---")
