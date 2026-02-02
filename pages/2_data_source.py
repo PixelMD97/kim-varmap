@@ -38,10 +38,8 @@ def auto_select_processed_rows(processed_df: pd.DataFrame) -> int:
 
     # Build fresh nodes/lookup from current master
     df_master = get_master_df()
-    df_master_for_tree = df_master.drop(
-        columns=[c for c in df_master.columns if str(c).startswith("__")],
-        errors="ignore",
-    )
+    df_master_for_tree = df_master.copy()
+
     _, leaf_lookup_master = build_nodes_and_lookup(df_master_for_tree)
     st.session_state["leaf_lookup_master"] = leaf_lookup_master
 
